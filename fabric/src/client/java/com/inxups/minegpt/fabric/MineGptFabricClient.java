@@ -28,6 +28,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
+import java.nio.file.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
@@ -67,6 +68,11 @@ public final class MineGptFabricClient implements ClientModInitializer {
     }
 
     private static final class FabricPlatform implements ClientPlatform {
+        @Override
+        public Path gameDirectory() {
+            return FabricLoader.getInstance().getGameDir();
+        }
+
         @Override
         public PlayerContext captureContext() {
             Minecraft minecraft = Minecraft.getInstance();

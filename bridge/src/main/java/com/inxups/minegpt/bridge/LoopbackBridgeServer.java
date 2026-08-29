@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicReference;
 final class LoopbackBridgeServer implements AutoCloseable {
     private final PendingMessageQueue queue;
     private final String token;
+    private final SkillStore skills;
     private final ExecutorService clients = Executors.newVirtualThreadPerTaskExecutor();
     private final AtomicReference<ClientConnection> activeConnection = new AtomicReference<>();
     private final ConcurrentHashMap<String, CompletableFuture<ChunkInfo>> pendingChunkRequests = new ConcurrentHashMap<>();
@@ -42,8 +43,13 @@ final class LoopbackBridgeServer implements AutoCloseable {
     private Thread acceptThread;
 
     LoopbackBridgeServer(PendingMessageQueue queue, String token) {
+        this(queue, token, new SkillStore());
+    }
+
+    LoopbackBridgeServer(PendingMessageQueue queue, String token, SkillStore skills) {
         this.queue = queue;
         this.token = token;
+        this.skills = skills;
     }
 
     synchronized void start(int requestedPort) throws IOException {
@@ -168,6 +174,14 @@ final class LoopbackBridgeServer implements AutoCloseable {
             if (!"hello".equals(hello.type()) || !token.equals(hello.token())) {
                 write(writer, ProtocolMessage.error("Invalid MineGPT pairing token."));
                 return;
+            }
+            if (hello.gameDirectory() != null) {
+                try {
+                    skills.setMinecraftDirectory(java.nio.file.Path.of(hello.gameDirectory()));
+                } catch (Exception exception) {
+                    write(writer, ProtocolMessage.error("Invalid Minecraft game directory."));
+                    return;
+                }
             }
             ClientConnection connection = new ClientConnection(socket, writer);
             ClientConnection previous = activeConnection.getAndSet(connection);

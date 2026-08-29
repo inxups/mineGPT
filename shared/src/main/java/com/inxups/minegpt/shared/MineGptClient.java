@@ -59,6 +59,7 @@ public final class MineGptClient implements AutoCloseable {
             }
         });
         bridge.setToken(pairingConfig.token());
+        bridge.setGameDirectory(platform.gameDirectory());
     }
 
     public void start() {

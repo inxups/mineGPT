@@ -32,6 +32,7 @@ import net.neoforged.neoforge.client.event.ClientChatEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -76,6 +77,11 @@ public final class MineGptNeoForge {
     }
 
     private static final class NeoForgePlatform implements ClientPlatform {
+        @Override
+        public Path gameDirectory() {
+            return FMLPaths.GAMEDIR.get();
+        }
+
         @Override
         public PlayerContext captureContext() {
             Minecraft minecraft = Minecraft.getInstance();

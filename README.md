@@ -73,18 +73,25 @@ The MCP server also provides these instructions during initialization. The
 explicit prompt makes the desired long-running workflow clear to the agent.
 
 On its first start, the Bridge creates a user-editable skills directory and a
-default guide without overwriting existing files:
+default guide without overwriting existing files. The directory is relative to
+the **actual game instance run directory reported by the client**:
 
-- macOS: `~/Library/Application Support/minecraft/minegpt/skills/`
-- Linux: `~/.minecraft/minegpt/skills/`
-- Windows: `%APPDATA%\\.minecraft\\minegpt\\skills\\`
+```text
+<game run directory>/minegpt/skills/
+```
+
+For the development launchers in this repository that is `fabric/run/minegpt/skills/`
+or `neoforge/run/minegpt/skills/`. With a launcher using a normal Minecraft
+instance it is that instance's `.minecraft/minegpt/skills/` directory. This
+means each Prism, Modrinth, or development instance can have different skills.
 
 Put Markdown skill files in this directory. ChatGPT Desktop does not scan local
 folders itself; MineGPT makes the folder available with `minegpt_list_skills()`
-and `minegpt_get_skill(name)`. The server instructions tell ChatGPT to list and
-load relevant skills at the start of a MineGPT task. For custom launchers, set
-the Bridge JVM property `minegpt.minecraftDir` or environment variable
-`MINEGPT_MINECRAFT_DIR` to that instance's Minecraft directory.
+and `minegpt_get_skill(name)`. The game client sends its run directory during
+the authenticated Bridge handshake, and the server instructions tell ChatGPT
+to list and load relevant skills at the start of a MineGPT task. For unusual
+launchers, set the client instance's normal game directory; no server setting
+is required.
 
 ## In-Game Use
 

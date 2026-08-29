@@ -11,12 +11,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
 
-/** User-editable Markdown skills stored alongside the local Minecraft directory. */
+/** User-editable Markdown skills stored alongside the active Minecraft instance. */
 final class SkillStore {
     static final String DEFAULT_SKILL_FILE = "minegpt-guide.md";
     private static final long MAX_SKILL_BYTES = 32 * 1024;
 
-    private final Path skillsDirectory;
+    private volatile Path skillsDirectory;
 
     SkillStore() {
         this(resolveMinecraftDirectory());
@@ -28,6 +28,14 @@ final class SkillStore {
 
     Path directory() {
         return skillsDirectory;
+    }
+
+    synchronized void setMinecraftDirectory(Path minecraftDirectory) throws IOException {
+        if (minecraftDirectory == null || !minecraftDirectory.isAbsolute()) {
+            return;
+        }
+        skillsDirectory = minecraftDirectory.toAbsolutePath().normalize().resolve("minegpt").resolve("skills");
+        initialize();
     }
 
     void initialize() throws IOException {

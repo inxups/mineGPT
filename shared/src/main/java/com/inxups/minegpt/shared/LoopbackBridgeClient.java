@@ -8,6 +8,7 @@ import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,6 +40,7 @@ public final class LoopbackBridgeClient implements AutoCloseable {
     private final LinkedBlockingDeque<ProtocolMessage> pending = new LinkedBlockingDeque<>(MAX_PENDING_MESSAGES);
     private final LinkedBlockingDeque<ProtocolMessage> responses = new LinkedBlockingDeque<>(16);
     private final AtomicReference<String> token = new AtomicReference<>();
+    private final AtomicReference<String> gameDirectory = new AtomicReference<>();
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean connected = new AtomicBoolean();
     private volatile Socket socket;
@@ -59,6 +61,11 @@ public final class LoopbackBridgeClient implements AutoCloseable {
 
     public void setToken(String pairingToken) {
         token.set(pairingToken);
+        closeSocket();
+    }
+
+    public void setGameDirectory(Path directory) {
+        gameDirectory.set(directory == null ? null : directory.toAbsolutePath().normalize().toString());
         closeSocket();
     }
 
@@ -109,7 +116,7 @@ public final class LoopbackBridgeClient implements AutoCloseable {
                 localSocket.setSoTimeout(250);
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(localSocket.getInputStream(), StandardCharsets.UTF_8));
                      BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(localSocket.getOutputStream(), StandardCharsets.UTF_8))) {
-                    write(writer, ProtocolMessage.hello(currentToken));
+                    write(writer, ProtocolMessage.hello(currentToken, gameDirectory.get()));
                     ProtocolMessage hello = readRequired(reader);
                     if (!"hello_accepted".equals(hello.type())) {
                         listener.onBridgeError(hello.detail() == null ? "Bridge rejected the pairing token." : hello.detail());

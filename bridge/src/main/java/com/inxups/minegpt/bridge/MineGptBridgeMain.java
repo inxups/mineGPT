@@ -20,9 +20,11 @@ public final class MineGptBridgeMain {
         BridgeStateStore stateStore = new BridgeStateStore(statePath);
         pairingToken = stateStore.token();
         PendingMessageQueue queue = new PendingMessageQueue(stateStore);
-        LoopbackBridgeServer bridge = new LoopbackBridgeServer(queue, pairingToken);
+        SkillStore skills = new SkillStore();
+        skills.initialize();
+        LoopbackBridgeServer bridge = new LoopbackBridgeServer(queue, pairingToken, skills);
         bridge.start(BridgeEndpoint.PORT);
-        McpSyncServer mcpServer = new MineGptMcpServer(bridge).start();
+        McpSyncServer mcpServer = new MineGptMcpServer(bridge, skills).start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             mcpServer.closeGracefully();

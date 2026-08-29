@@ -123,6 +123,26 @@ class LoopbackBridgeServerTest {
         }
     }
 
+    @Test
+    void usesTheGameDirectoryReportedByTheMinecraftClient() throws Exception {
+        BridgeStateStore state = new BridgeStateStore(temporaryDirectory.resolve("bridge-state.json"));
+        PendingMessageQueue queue = new PendingMessageQueue(state);
+        SkillStore skills = new SkillStore(temporaryDirectory.resolve("fallback-instance"));
+        try (LoopbackBridgeServer server = new LoopbackBridgeServer(queue, state.token(), skills)) {
+            server.start(0);
+            try (Socket client = new Socket(BridgeEndpoint.address(), server.port());
+                 BufferedReader reader = reader(client);
+                 BufferedWriter writer = writer(client)) {
+                Path instanceDirectory = temporaryDirectory.resolve("actual-run").toAbsolutePath();
+                send(writer, ProtocolMessage.hello(state.token(), instanceDirectory.toString()));
+                assertEquals("hello_accepted", receive(reader).type());
+                assertTrue(skills.directory().startsWith(instanceDirectory));
+                assertTrue(java.nio.file.Files.isRegularFile(
+                        instanceDirectory.resolve("minegpt/skills/minegpt-guide.md")));
+            }
+        }
+    }
+
     private static BufferedReader reader(Socket socket) throws Exception {
         return new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
     }
