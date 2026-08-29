@@ -138,7 +138,7 @@ class LoopbackBridgeServerTest {
                 assertEquals("hello_accepted", receive(reader).type());
                 assertTrue(skills.directory().startsWith(instanceDirectory));
                 assertTrue(java.nio.file.Files.isRegularFile(
-                        instanceDirectory.resolve(".minecraft/minegpt/skills/minegpt-guide.md")));
+                        instanceDirectory.resolve("minegpt/skills/minegpt-guide.md")));
             }
         }
     }

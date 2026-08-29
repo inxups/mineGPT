@@ -39,11 +39,7 @@ final class SkillStore {
     }
 
     private static Path skillsPath(Path instanceDirectory) {
-        Path normalized = instanceDirectory.toAbsolutePath().normalize();
-        Path minecraftDirectory = ".minecraft".equalsIgnoreCase(String.valueOf(normalized.getFileName()))
-                ? normalized
-                : normalized.resolve(".minecraft");
-        return minecraftDirectory.resolve("minegpt").resolve("skills");
+        return instanceDirectory.toAbsolutePath().normalize().resolve("minegpt").resolve("skills");
     }
 
     void initialize() throws IOException {

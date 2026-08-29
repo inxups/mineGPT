@@ -76,7 +76,7 @@ final class MineGptMcpServer {
 
     private String instructions() {
         return "MineGPT bridges a local Minecraft client. User-editable Markdown skills live in "
-                + "<active game directory>/.minecraft/minegpt/skills after the client handshake. At the start of a MineGPT task, call minegpt_list_skills and load the skill relevant to the player's request with minegpt_get_skill. "
+                + "<active game run directory>/minegpt/skills after the client handshake. At the start of a MineGPT task, call minegpt_list_skills and load the skill relevant to the player's request with minegpt_get_skill. "
                 + "A default minegpt-guide.md is created after Minecraft reports its game directory. Game-data tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
     }
 
