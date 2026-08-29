@@ -6,7 +6,7 @@ import java.util.UUID;
 
 /** Shared client behaviour; Fabric and NeoForge only supply platform adapters. */
 public final class MineGPTClient implements AutoCloseable {
-    private static final String PREFIX = "@ai";
+    private static final String PREFIX = "@gpt";
     private final ClientPlatform platform;
     private final PairingConfig pairingConfig;
     private final LoopbackBridgeClient bridge;
@@ -80,7 +80,7 @@ public final class MineGPTClient implements AutoCloseable {
         }
         String text = chatMessage.substring(PREFIX.length()).trim();
         if (text.isEmpty()) {
-            platform.showLocalMessage("[MineGPT] Usage: @ai <message>");
+            platform.showLocalMessage("[MineGPT] Usage: @gpt <message>");
             return true;
         }
         if (!pairingConfig.isPaired()) {

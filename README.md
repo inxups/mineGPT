@@ -1,66 +1,48 @@
 # MineGPT
 
-MineGPT is a client-only Minecraft 1.21.1 chat companion for Fabric and
-NeoForge. It does not call the OpenAI API and requires no Minecraft server Mod
-or plugin. A local Java Bridge exposes Minecraft messages as MCP tools to the
-ChatGPT Desktop app.
+[中文文档](README.zh-CN.md)
+
+Use ChatGPT Desktop as a companion in your Minecraft 1.21.1 game. Type a
+question with `@gpt` in Minecraft and receive the reply as a local chat message.
+MineGPT is client-only: it does not require a server Mod or plugin, and your
+`@gpt` messages are never sent to a multiplayer server or other players.
 
 ```text
-Minecraft @ai message -> 127.0.0.1:37832 -> MineGPT Bridge (MCP STDIO)
-    -> ChatGPT Desktop -> MCP reply tool -> local Minecraft chat
+Minecraft @gpt message -> local MineGPT Bridge -> ChatGPT Desktop -> local reply
 ```
 
-## Requirements
+## Install MineGPT
 
-- Minecraft `1.21.1` and Java `21`.
-- Either Fabric Loader or NeoForge, matching the selected Mod JAR.
-- ChatGPT Desktop with local MCP server support. This is a local Codex-host MCP
-  connection, not a ChatGPT web plugin.
+1. Add the MineGPT Mod JAR to the `mods` folder of the Minecraft instance you
+   will play. Fabric users must also install Fabric API in that same instance.
+2. Extract the MineGPT Bridge distribution somewhere that will remain available
+   on your computer. You will give ChatGPT Desktop the absolute path to its
+   launch script:
 
-## Build
+   - macOS/Linux: `bin/minegpt-bridge`
+   - Windows: `bin/minegpt-bridge.bat`
 
-Each component is an independent Gradle project:
+3. Start the selected Minecraft instance once. MineGPT runs only on your client;
+   there is nothing to install on the multiplayer server.
 
-```sh
-cd fabric
-./gradlew build
-```
+## Connect ChatGPT Desktop
 
-```sh
-cd neoforge
-./gradlew build
-```
-
-```sh
-cd bridge
-./gradlew installDist
-```
-
-Install exactly one of the resulting client Mod JARs:
-
-- `fabric/build/libs/minegpt-fabric-0.1.0-SNAPSHOT.jar`
-- `neoforge/build/libs/minegpt-0.1.0-SNAPSHOT.jar`
-
-The Bridge distribution is written to
-`bridge/build/install/minegpt-bridge`. Its command is
-`bin/minegpt-bridge` on macOS/Linux and `bin/minegpt-bridge.bat` on Windows.
-
-## ChatGPT Desktop Setup
-
-1. Build the Bridge and open ChatGPT Desktop **Settings -> MCP servers**.
-2. Add a **STDIO** server named `minegpt`. Set its command to the absolute path
-   of the distribution script above; no arguments or API key are required.
-3. Restart ChatGPT Desktop, then use `/mcp` to confirm that `minegpt` is
-   connected.
-4. In a ChatGPT Desktop conversation, ask it to call
-   `minegpt_pairing_code`. Copy the returned `token` value.
-5. Start Minecraft with the selected client Mod and run:
+1. In ChatGPT Desktop, open **Settings -> MCP servers** and add a **STDIO**
+   server named `minegpt`.
+2. Set its command to the absolute Bridge script path from the previous section.
+   Do not add arguments or an API key.
+3. Restart ChatGPT Desktop, then run `/mcp` in a conversation to confirm that
+   `minegpt` is connected.
+4. In that conversation, ask ChatGPT to call `minegpt_pairing_code`, then copy
+   the returned `token`.
+5. In Minecraft, run:
 
    ```text
    /minegpt pair <token>
    ```
 
-6. In the same ChatGPT conversation, send this prompt:
+6. Tell ChatGPT to listen for your in-game questions. This prompt is a useful
+   starting point:
 
    ```text
    Start listening to Minecraft. For every MineGPT player message, answer it,
@@ -69,122 +51,83 @@ The Bridge distribution is written to
    to stop.
    ```
 
-The MCP server also provides these instructions during initialization. The
-explicit prompt makes the desired long-running workflow clear to the agent.
+Keep this ChatGPT conversation open while it is listening. Minecraft cannot
+open or wake a conversation on its own.
 
-On its first start, the Bridge creates a user-editable skills directory and a
-default guide without overwriting existing files. The directory is relative to
-the **actual game instance run directory reported by the client**:
+## Use It In Game
+
+- Type `@gpt <message>` in the normal Minecraft chat box. For example:
+
+  ```text
+  @gpt What can I craft with the items in my inventory?
+  ```
+
+- ChatGPT replies appear as local `[MineGPT]` system messages. Ordinary chat
+  without the `@gpt` prefix is unchanged.
+- Run `/minegpt status` to check pairing, Bridge connection, and queued-message
+  status.
+- Run `/minegpt github <github_url>` to install one public GitHub Markdown
+  skill into this Minecraft instance. Use a normal GitHub file-page URL or a
+  `raw.githubusercontent.com` URL. Existing skills are never overwritten.
+
+## Add Skills
+
+MineGPT creates a user-editable skill folder for each Minecraft instance:
 
 ```text
 <game run directory>/minegpt/skills/
 ```
 
-For the development launchers in this repository that is
-`fabric/run/minegpt/skills/` or `neoforge/run/minegpt/skills/`. With a normal
-launcher, the reported game run directory is usually its `.minecraft` folder,
-so the path is `.minecraft/minegpt/skills/`. This
-means each Prism, Modrinth, or development instance can have different skills.
+For most launchers, the game run directory is that instance's `.minecraft`
+folder. This keeps skills separate between Prism, Modrinth, and other instances.
+Add Markdown files directly or in subfolders, such as
+`building/redstone/guide.md`. Paths may be up to eight folders deep and each
+file may be up to 256 KiB.
 
-Put Markdown skill files in this directory. Subdirectories are supported up to
-eight levels deep, so a skill can be named `building/redstone/guide.md`.
-Individual files may be up to 256 KiB. ChatGPT Desktop does not scan local
-folders itself; MineGPT makes the folder available with `minegpt_list_skills()`
-and `minegpt_get_skill(name)`. The game client sends its run directory during
-the authenticated Bridge handshake, and the server instructions tell ChatGPT
-to list and load relevant skills at the start of a MineGPT task. For unusual
-launchers, the client reports its normal game directory; no server setting is
-required. After the client connects, the Bridge keeps the default
-`minegpt-guide.md` present and recreates it if it is deleted; custom skill files
-are never overwritten or regenerated.
+The default `minegpt-guide.md` is restored if it is deleted. Your own skill
+files are never overwritten or regenerated.
 
-## In-Game Use
+## Privacy, Safety, And Limits
 
-- Type `@ai <message>` in the normal Minecraft chat box. MineGPT intercepts it
-  locally, so it is never sent to a multiplayer server or other players.
-- Use `/minegpt status` to see pairing, Bridge connection, and local pending
-  message state.
-- Use `/minegpt github <github_url>` to download one public GitHub Markdown
-  Skill directly into this game's `minegpt/skills/` directory. The skill uses
-  a new folder named for its source directory, then uses the filename from the
-  URL. For example, `skills/aiq-deploy/SKILL.md` is installed as
-  `minegpt/skills/aiq-deploy/SKILL.md`. A Markdown file at a repository root
-  uses the repository name as its folder.
-  Paste either a normal `https://github.com/owner/repository/blob/ref/path.md`
-  file-page URL or an `https://raw.githubusercontent.com/...` URL. It is
-  processed locally and does not require the Bridge or send a command to a
-  multiplayer server; an existing Skill is never overwritten by this command.
-- ChatGPT replies appear as local `[MineGPT]` system messages. Ordinary chat
-  without the `@ai` prefix is unchanged.
+MineGPT listens only on `127.0.0.1:37832` and pairs your game with ChatGPT
+Desktop through a random token. The Bridge keeps its token and up to 200 pending
+messages for 24 hours in `~/.minegpt/bridge-state.json`; the Minecraft client
+stores only its pairing token in `config/minegpt.json`.
 
-The Bridge listens only on `127.0.0.1:37832`, requires a random pairing token,
-and stores its token plus up to 200 pending messages for 24 hours in
-`~/.minegpt/bridge-state.json`. The Minecraft client stores only its pairing
-token in its normal `config/minegpt.json` file.
+The connected ChatGPT conversation can inspect bounded, read-only information
+from the active Minecraft client. It cannot run Minecraft commands, move the
+player, modify the world, interact with a server, load new chunks, or access
+full chat history, item/block-entity NBT, or chunks your client has not loaded.
+Game-file access is limited to the paired instance directory and paths outside
+it are rejected.
 
-## MCP Tools And Limits
+If ChatGPT is between tool calls, the Bridge queues messages. If the Bridge is
+unavailable, the Mod reports the problem and keeps up to 200 unsent messages in
+memory until it reconnects or Minecraft closes.
 
-- `minegpt_status()` returns the Bridge connection and queue state.
-- `minegpt_pairing_code()` returns the local host, port, and pairing token.
-- `minegpt_list_skills()` lists Markdown skills in the local Minecraft
-  `minegpt/skills` directory, including nested files up to eight levels deep.
-- `minegpt_get_skill(name?)` reads one listed Markdown skill by its relative
-  path; omitting `name` loads the default `minegpt-guide.md`.
-- `minegpt_import_github_skill(repository, source_path, ref?,
-  destination_path?, overwrite?)` downloads one explicitly requested Markdown
-  skill from a public GitHub repository into `minegpt/skills/`. `repository` is
-  `owner/repository`, `source_path` is a repository-relative `.md` path, and
-  `ref` defaults to `main`. By default the file is installed under its source
-  filename and will not overwrite an existing skill. Set `overwrite: true` and
-  provide `destination_path` only when replacement is intended. Downloads use
-  GitHub's fixed raw-content host, allow up to 256 KiB of valid UTF-8 Markdown,
-  and require no GitHub account or token; private repositories are unsupported.
-- `minegpt_list_game_files(path?, max_depth?)` lists files and directories
-  under the active Minecraft instance directory. It accepts only relative paths,
-  scans up to eight levels below the requested directory, skips symlinks, and
-  returns at most 500 entries. Omit `path` to start at the instance root.
-- `minegpt_read_game_file(path, offset?, max_bytes?, encoding?)` reads any
-  regular file anywhere under the active instance directory in bounded chunks.
-  It returns UTF-8 text or Base64, with a default 64 KiB and maximum 256 KiB per
-  call; use `offset` to continue a larger file.
-- `minegpt_get_game_options()` parses the active instance's `options.txt`.
-- `minegpt_list_installed_mods()` lists Mod JARs in `mods/`, and
-  `minegpt_list_saved_worlds()` lists world directories in `saves/`.
-- `minegpt_get_recent_log(max_lines?)` returns the tail of `logs/latest.log`,
-  up to 1000 lines.
-- `minegpt_get_chunk_info(chunk_x?, chunk_z?)` returns a read-only snapshot of a
-  single chunk already loaded by the client. Omitting both coordinates reads the
-  player's current chunk; otherwise provide both chunk coordinates. It returns
-  the dimension, game time, build-height range, and 256 surface heights and
-  block IDs in row-major `local_z * 16 + local_x` order. It never asks the
-  Minecraft server to load a chunk. An unloaded chunk returns `loaded: false`.
-- `minegpt_get_player_state()` returns the current player position, dimension,
-  health, hunger, experience, and game mode.
-- `minegpt_get_target()` returns the block or entity under the crosshair.
-- `minegpt_get_inventory()` returns non-empty hotbar, main-inventory, armor,
-  and offhand slots with item IDs, counts, and durability; item NBT is omitted.
-- `minegpt_get_nearby_entities(radius?)` returns at most 64 client-visible
-  entities within a radius of 1--64 blocks (default 32).
-- `minegpt_get_block(x, y, z)` returns one already loaded block's ID, state,
-  light, and block-entity type. It does not load the containing chunk.
-- `minegpt_get_chunk_section(chunk_x, chunk_z, section_y)` returns counts of
-  up to 64 block IDs in one already loaded 16 by 16 by 16 section; `section_y`
-  is the vertical section coordinate, not a block Y coordinate.
-- `minegpt_get_biome_and_environment()` returns the player's biome, world time,
-  moon phase, weather, difficulty, and local block/sky light.
-- `minegpt_next_message(wait_seconds)` reads the oldest unhandled player
-  message and waits no longer than 45 seconds.
-- `minegpt_reply(message_id, text)` displays a reply locally in Minecraft.
+For the complete MCP tool reference, see [CHANGELOG.md](CHANGELOG.md).
 
-Minecraft cannot create or wake a ChatGPT conversation. The Bridge can queue
-messages while its ChatGPT Desktop process is running but the listening task is
-between tool calls. If the Bridge itself is not running, the Mod reports that
-the local Bridge is unavailable and retains up to 200 unsent messages in memory
-until it reconnects or Minecraft closes.
+## Build From Source
 
-All read tools are bounded and read-only. Instance-file tools access only the
-active game run directory reported by the paired client; paths that resolve
-outside it are rejected. Minecraft live-data tools do not expose item/block-
-entity NBT, full chat history, or chunks the client has not loaded. A
-disconnected client or unavailable data produces a structured `available:
-false` result rather than loading or modifying anything.
+You only need these steps when a built Mod JAR and Bridge distribution are not
+available. Build the Bridge and the one client Mod you plan to use:
+
+```sh
+cd bridge
+./gradlew installDist
+```
+
+```sh
+cd fabric
+./gradlew build
+```
+
+Or, for NeoForge:
+
+```sh
+cd neoforge
+./gradlew build
+```
+
+The Bridge is written to `bridge/build/install/minegpt-bridge`. The Mod JAR is
+written to the selected project's `build/libs` directory.
