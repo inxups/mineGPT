@@ -1,0 +1,21 @@
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Gradle and Minecraft development output in every independent module.
+**/.gradle/
+**/build/
+**/run/
+**/runs/
+**/repo/
+
+fabric/.gradle/
+fabric/build/
+fabric/run/
+
+neoforge/.gradle/
+neoforge/build/
+neoforge/run/
+neoforge/runs/
+neoforge/repo/

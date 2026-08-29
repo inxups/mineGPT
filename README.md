@@ -1,0 +1,101 @@
+# MineGPT
+
+MineGPT is a client-only Minecraft 1.21.1 chat companion for Fabric and
+NeoForge. It does not call the OpenAI API and requires no Minecraft server Mod
+or plugin. A local Java Bridge exposes Minecraft messages as MCP tools to the
+ChatGPT Desktop app.
+
+```text
+Minecraft @ai message -> 127.0.0.1:37832 -> MineGPT Bridge (MCP STDIO)
+    -> ChatGPT Desktop -> MCP reply tool -> local Minecraft chat
+```
+
+## Requirements
+
+- Minecraft `1.21.1` and Java `21`.
+- Either Fabric Loader or NeoForge, matching the selected Mod JAR.
+- ChatGPT Desktop with local MCP server support. This is a local Codex-host MCP
+  connection, not a ChatGPT web plugin.
+
+## Build
+
+Each component is an independent Gradle project:
+
+```sh
+cd fabric
+./gradlew build
+```
+
+```sh
+cd neoforge
+./gradlew build
+```
+
+```sh
+cd bridge
+./gradlew installDist
+```
+
+Install exactly one of the resulting client Mod JARs:
+
+- `fabric/build/libs/minegpt-fabric-0.1.0-SNAPSHOT.jar`
+- `neoforge/build/libs/minegpt-0.1.0-SNAPSHOT.jar`
+
+The Bridge distribution is written to
+`bridge/build/install/minegpt-bridge`. Its command is
+`bin/minegpt-bridge` on macOS/Linux and `bin/minegpt-bridge.bat` on Windows.
+
+## ChatGPT Desktop Setup
+
+1. Build the Bridge and open ChatGPT Desktop **Settings -> MCP servers**.
+2. Add a **STDIO** server named `minegpt`. Set its command to the absolute path
+   of the distribution script above; no arguments or API key are required.
+3. Restart ChatGPT Desktop, then use `/mcp` to confirm that `minegpt` is
+   connected.
+4. In a ChatGPT Desktop conversation, ask it to call
+   `minegpt_pairing_code`. Copy the returned `token` value.
+5. Start Minecraft with the selected client Mod and run:
+
+   ```text
+   /minegpt pair <token>
+   ```
+
+6. In the same ChatGPT conversation, send this prompt:
+
+   ```text
+   Start listening to Minecraft. For every MineGPT player message, answer it,
+   call minegpt_reply with the exact message_id, then immediately call
+   minegpt_next_message again with wait_seconds 45. Continue until I tell you
+   to stop.
+   ```
+
+The MCP server also provides these instructions during initialization. The
+explicit prompt makes the desired long-running workflow clear to the agent.
+
+## In-Game Use
+
+- Type `@ai <message>` in the normal Minecraft chat box. MineGPT intercepts it
+  locally, so it is never sent to a multiplayer server or other players.
+- Use `/minegpt status` to see pairing, Bridge connection, and local pending
+  message state.
+- ChatGPT replies appear as local `[MineGPT]` system messages. Ordinary chat
+  without the `@ai` prefix is unchanged.
+
+The Bridge listens only on `127.0.0.1:37832`, requires a random pairing token,
+and stores its token plus up to 200 pending messages for 24 hours in
+`~/.minegpt/bridge-state.json`. The Minecraft client stores only its pairing
+token in its normal `config/minegpt.json` file.
+
+## MCP Tools And Limits
+
+- `minegpt_status()` returns the Bridge connection and queue state.
+- `minegpt_pairing_code()` returns the local host, port, and pairing token.
+- `minegpt_next_message(wait_seconds)` reads the oldest unhandled player
+  message and waits no longer than 45 seconds.
+- `minegpt_reply(message_id, text)` displays a reply locally in Minecraft.
+
+Minecraft cannot create or wake a ChatGPT conversation. The Bridge can queue
+messages while its ChatGPT Desktop process is running but the listening task is
+between tool calls. If the Bridge itself is not running, the Mod reports that
+the local Bridge is unavailable and retains up to 200 unsent messages in memory
+until it reconnects or Minecraft closes.

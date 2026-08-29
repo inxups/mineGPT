@@ -1,0 +1,23 @@
+{
+	"schemaVersion": 1,
+	"id": "minegpt",
+	"version": "${version}",
+	"name": "MineGPT",
+	"description": "Client-only Minecraft chat companion integration.",
+	"authors": [
+		"inxups"
+	],
+	"license": "All Rights Reserved",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.inxups.minegpt.fabric.MineGptFabricClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
