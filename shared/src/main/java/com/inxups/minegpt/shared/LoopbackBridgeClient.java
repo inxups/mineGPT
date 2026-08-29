@@ -5,7 +5,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -20,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * silently lose a player message.
  */
 public final class LoopbackBridgeClient implements AutoCloseable {
-    public static final int PORT = 37832;
+    public static final int PORT = BridgeEndpoint.PORT;
     private static final int MAX_PENDING_MESSAGES = 200;
 
     public interface Listener {
@@ -87,7 +86,7 @@ public final class LoopbackBridgeClient implements AutoCloseable {
             }
             try (Socket localSocket = new Socket()) {
                 socket = localSocket;
-                localSocket.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 2_000);
+                localSocket.connect(new InetSocketAddress(BridgeEndpoint.HOST, port), 2_000);
                 localSocket.setSoTimeout(250);
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(localSocket.getInputStream(), StandardCharsets.UTF_8));
                      BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(localSocket.getOutputStream(), StandardCharsets.UTF_8))) {

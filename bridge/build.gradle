@@ -35,6 +35,9 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // This matches Minecraft's development JVM configuration and guards against
+    // an accidental IPv6 loopback regression.
+    systemProperty 'java.net.preferIPv6Addresses', 'system'
 }
 
 tasks.withType(JavaCompile).configureEach {

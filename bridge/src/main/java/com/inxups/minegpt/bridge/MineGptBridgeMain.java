@@ -1,6 +1,7 @@
 package com.inxups.minegpt.bridge;
 
 import io.modelcontextprotocol.server.McpSyncServer;
+import com.inxups.minegpt.shared.BridgeEndpoint;
 import java.nio.file.Path;
 
 /** Entry point used as a local STDIO MCP server by ChatGPT Desktop. */
@@ -20,7 +21,7 @@ public final class MineGptBridgeMain {
         pairingToken = stateStore.token();
         PendingMessageQueue queue = new PendingMessageQueue(stateStore);
         LoopbackBridgeServer bridge = new LoopbackBridgeServer(queue, pairingToken);
-        bridge.start(37832);
+        bridge.start(BridgeEndpoint.PORT);
         McpSyncServer mcpServer = new MineGptMcpServer(bridge).start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

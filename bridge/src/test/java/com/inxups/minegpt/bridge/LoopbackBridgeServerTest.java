@@ -3,6 +3,7 @@ package com.inxups.minegpt.bridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.inxups.minegpt.shared.BridgeEndpoint;
 import com.inxups.minegpt.shared.PlayerContext;
 import com.inxups.minegpt.shared.PlayerMessage;
 import com.inxups.minegpt.shared.ProtocolCodec;
@@ -11,7 +12,6 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -29,14 +29,14 @@ class LoopbackBridgeServerTest {
         PendingMessageQueue queue = new PendingMessageQueue(state);
         try (LoopbackBridgeServer server = new LoopbackBridgeServer(queue, state.token())) {
             server.start(0);
-            try (Socket rejected = new Socket(InetAddress.getLoopbackAddress(), server.port());
+            try (Socket rejected = new Socket(BridgeEndpoint.address(), server.port());
                  BufferedReader reader = reader(rejected);
                  BufferedWriter writer = writer(rejected)) {
                 send(writer, ProtocolMessage.hello("incorrect-token"));
                 assertEquals("error", receive(reader).type());
             }
 
-            try (Socket accepted = new Socket(InetAddress.getLoopbackAddress(), server.port());
+            try (Socket accepted = new Socket(BridgeEndpoint.address(), server.port());
                  BufferedReader reader = reader(accepted);
                  BufferedWriter writer = writer(accepted)) {
                 send(writer, ProtocolMessage.hello(state.token()));

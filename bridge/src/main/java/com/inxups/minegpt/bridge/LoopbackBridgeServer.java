@@ -1,6 +1,7 @@
 package com.inxups.minegpt.bridge;
 
 import com.inxups.minegpt.shared.PlayerMessage;
+import com.inxups.minegpt.shared.BridgeEndpoint;
 import com.inxups.minegpt.shared.ProtocolCodec;
 import com.inxups.minegpt.shared.ProtocolMessage;
 import java.io.BufferedReader;
@@ -8,7 +9,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -39,7 +39,7 @@ final class LoopbackBridgeServer implements AutoCloseable {
         if (running.get()) {
             return;
         }
-        serverSocket = new ServerSocket(requestedPort, 16, InetAddress.getLoopbackAddress());
+        serverSocket = new ServerSocket(requestedPort, 16, BridgeEndpoint.address());
         running.set(true);
         acceptThread = Thread.ofVirtual().name("minegpt-bridge-accept").start(this::acceptLoop);
     }
