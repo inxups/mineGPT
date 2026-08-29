@@ -73,7 +73,16 @@ public final class MineGPTNeoForge {
                         .executes(context -> {
                             mineGPT.showStatus();
                             return 1;
-                        })));
+                        }))
+                .then(Commands.literal("github")
+                        .then(Commands.argument("github_url", StringArgumentType.greedyString())
+                                .executes(this::importGitHubSkill))));
+    }
+
+    private int importGitHubSkill(com.mojang.brigadier.context.CommandContext<?> context) {
+        mineGPT.importGitHubSkillUrl(
+                StringArgumentType.getString(context, "github_url"), null);
+        return 1;
     }
 
     private static final class NeoForgePlatform implements ClientPlatform {

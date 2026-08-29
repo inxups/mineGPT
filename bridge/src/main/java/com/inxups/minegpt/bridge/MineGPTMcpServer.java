@@ -21,6 +21,7 @@ final class MineGPTMcpServer {
     private final LoopbackBridgeServer bridge;
     private final SkillStore skills;
     private final GameDirectoryStore gameFiles;
+    private final GitHubSkillImporter githubSkills;
 
     MineGPTMcpServer(LoopbackBridgeServer bridge) {
         this(bridge, new SkillStore());
@@ -30,6 +31,7 @@ final class MineGPTMcpServer {
         this.bridge = bridge;
         this.skills = skills;
         this.gameFiles = new GameDirectoryStore(skills);
+        this.githubSkills = new GitHubSkillImporter(skills);
     }
 
     McpSyncServer start() {
@@ -48,6 +50,8 @@ final class MineGPTMcpServer {
                         (exchange, request) -> listSkills())
                 .toolCall(tool("minegpt_get_skill", "Read one Markdown skill from the local Minecraft minegpt/skills directory. Call minegpt_list_skills first and pass its relative path.", skillSchema()),
                         (exchange, request) -> getSkill(request.arguments()))
+                .toolCall(tool("minegpt_import_github_skill", "Download one explicitly requested Markdown skill from a public GitHub repository into the local Minecraft minegpt/skills directory. Existing files are not overwritten unless overwrite is true.", githubSkillSchema()),
+                        (exchange, request) -> importGitHubSkill(request.arguments()))
                 .toolCall(tool("minegpt_list_game_files", "Recursively list files and directories in the active Minecraft game directory without leaving it. Results are capped at 500 entries.", gameFileListSchema()),
                         (exchange, request) -> listGameFiles(request.arguments()))
                 .toolCall(tool("minegpt_read_game_file", "Read a bounded byte range from a regular file in the active Minecraft game directory as UTF-8 text or Base64.", gameFileReadSchema()),
@@ -91,6 +95,7 @@ final class MineGPTMcpServer {
     private String instructions() {
         return "MineGPT bridges a local Minecraft client. The active game directory is available through read-only file tools after the client handshake. "
                 + "User-editable Markdown skills live in <active game run directory>/minegpt/skills and are optional workflows: call minegpt_list_skills only when a relevant skill is needed. "
+                + "Only call minegpt_import_github_skill when the user explicitly asks to install a skill from a public GitHub repository. "
                 + "Game-data tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
     }
 
@@ -113,6 +118,28 @@ final class MineGPTMcpServer {
             return success(skills.read(name));
         } catch (Exception exception) {
             return failure("Could not read MineGPT skill: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult importGitHubSkill(Map<String, Object> arguments) {
+        String repository = stringArgument(arguments, "repository");
+        String sourcePath = stringArgument(arguments, "source_path");
+        String ref = stringArgument(arguments, "ref");
+        String destinationPath = stringArgument(arguments, "destination_path");
+        if (repository == null || sourcePath == null || !isOptionalString(arguments, "repository")
+                || !isOptionalString(arguments, "source_path") || !isOptionalString(arguments, "ref")
+                || !isOptionalString(arguments, "destination_path") || !isOptionalBoolean(arguments, "overwrite")) {
+            return failure("repository and source_path are required strings; ref and destination_path must be strings; overwrite must be a boolean.");
+        }
+        boolean overwrite = booleanArgument(arguments, "overwrite", false);
+        try {
+            return success(ProtocolCodec.toJson(githubSkills.importSkill(
+                    repository, sourcePath, ref, destinationPath, overwrite)));
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return failure("GitHub skill download was interrupted.");
+        } catch (Exception exception) {
+            return failure("Could not import GitHub skill: " + exception.getMessage());
         }
     }
 
@@ -294,6 +321,18 @@ final class MineGPTMcpServer {
                 || arguments.get(name) instanceof String;
     }
 
+    private static boolean isOptionalBoolean(Map<String, Object> arguments, String name) {
+        return arguments == null || !arguments.containsKey(name) || arguments.get(name) == null
+                || arguments.get(name) instanceof Boolean;
+    }
+
+    private static boolean booleanArgument(Map<String, Object> arguments, String name, boolean defaultValue) {
+        if (arguments == null || !(arguments.get(name) instanceof Boolean value)) {
+            return defaultValue;
+        }
+        return value;
+    }
+
     private static boolean isOptionalInteger(Map<String, Object> arguments, String name) {
         if (arguments == null || !arguments.containsKey(name) || arguments.get(name) == null) {
             return true;
@@ -370,6 +409,15 @@ final class MineGPTMcpServer {
         return Map.of("name", Map.of(
                 "type", "string",
                 "description", "Exact relative Markdown path returned by minegpt_list_skills; omit to load minegpt-guide.md."));
+    }
+
+    private static Map<String, Object> githubSkillSchema() {
+        return Map.of(
+                "repository", Map.of("type", "string", "description", "Required public GitHub repository in owner/repository form."),
+                "source_path", Map.of("type", "string", "description", "Required relative path to one Markdown file in the repository."),
+                "ref", Map.of("type", "string", "description", "Optional simple branch or tag name. Defaults to main."),
+                "destination_path", Map.of("type", "string", "description", "Optional relative Markdown path under minegpt/skills. Defaults to the source filename."),
+                "overwrite", Map.of("type", "boolean", "description", "Set true only to replace an existing skill. Defaults to false."));
     }
 
     private static Map<String, Object> gameFileListSchema() {

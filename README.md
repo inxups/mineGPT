@@ -104,6 +104,16 @@ are never overwritten or regenerated.
   locally, so it is never sent to a multiplayer server or other players.
 - Use `/minegpt status` to see pairing, Bridge connection, and local pending
   message state.
+- Use `/minegpt github <github_url>` to download one public GitHub Markdown
+  Skill directly into this game's `minegpt/skills/` directory. The skill uses
+  a new folder named for its source directory, then uses the filename from the
+  URL. For example, `skills/aiq-deploy/SKILL.md` is installed as
+  `minegpt/skills/aiq-deploy/SKILL.md`. A Markdown file at a repository root
+  uses the repository name as its folder.
+  Paste either a normal `https://github.com/owner/repository/blob/ref/path.md`
+  file-page URL or an `https://raw.githubusercontent.com/...` URL. It is
+  processed locally and does not require the Bridge or send a command to a
+  multiplayer server; an existing Skill is never overwritten by this command.
 - ChatGPT replies appear as local `[MineGPT]` system messages. Ordinary chat
   without the `@ai` prefix is unchanged.
 
@@ -120,6 +130,15 @@ token in its normal `config/minegpt.json` file.
   `minegpt/skills` directory, including nested files up to eight levels deep.
 - `minegpt_get_skill(name?)` reads one listed Markdown skill by its relative
   path; omitting `name` loads the default `minegpt-guide.md`.
+- `minegpt_import_github_skill(repository, source_path, ref?,
+  destination_path?, overwrite?)` downloads one explicitly requested Markdown
+  skill from a public GitHub repository into `minegpt/skills/`. `repository` is
+  `owner/repository`, `source_path` is a repository-relative `.md` path, and
+  `ref` defaults to `main`. By default the file is installed under its source
+  filename and will not overwrite an existing skill. Set `overwrite: true` and
+  provide `destination_path` only when replacement is intended. Downloads use
+  GitHub's fixed raw-content host, allow up to 256 KiB of valid UTF-8 Markdown,
+  and require no GitHub account or token; private repositories are unsupported.
 - `minegpt_list_game_files(path?, max_depth?)` lists files and directories
   under the active Minecraft instance directory. It accepts only relative paths,
   scans up to eight levels below the requested directory, skips symlinks, and

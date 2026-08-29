@@ -4,8 +4,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.List;
@@ -18,7 +21,7 @@ import java.util.stream.Stream;
 /** User-editable Markdown skills stored alongside the active Minecraft instance. */
 final class SkillStore implements AutoCloseable {
     static final String DEFAULT_SKILL_FILE = "minegpt-guide.md";
-    private static final long MAX_SKILL_BYTES = 256 * 1024;
+    static final long MAX_SKILL_BYTES = 256 * 1024;
     private static final int MAX_SKILL_NESTING_DEPTH = 8;
 
     private volatile Path skillsDirectory;
@@ -115,6 +118,34 @@ final class SkillStore implements AutoCloseable {
         return Files.readString(skill, StandardCharsets.UTF_8);
     }
 
+    synchronized Path writeImportedSkill(String name, byte[] contents, boolean overwrite) throws IOException {
+        initialize();
+        if (contents == null || contents.length == 0 || contents.length > MAX_SKILL_BYTES) {
+            throw new IOException("Skill files must contain at most " + MAX_SKILL_BYTES + " bytes.");
+        }
+        Path target = resolveSkillPath(name);
+        ensureSafeSkillDirectory(target.getParent());
+        if (Files.isSymbolicLink(target)) {
+            throw new IOException("Skill target must not be a symbolic link.");
+        }
+        if (!overwrite && Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            throw new java.nio.file.FileAlreadyExistsException("Skill already exists: " + name);
+        }
+        Path temporary = Files.createTempFile(target.getParent(), ".minegpt-import-", ".tmp");
+        try {
+            Files.write(temporary, contents, StandardOpenOption.TRUNCATE_EXISTING);
+            moveImportedSkill(temporary, target, overwrite);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+        return target;
+    }
+
+    synchronized void validateImportTarget(String name) throws IOException {
+        initialize();
+        resolveSkillPath(name);
+    }
+
     private SkillSummary summary(Path skill) {
         try {
             if (Files.size(skill) > MAX_SKILL_BYTES) {
@@ -127,6 +158,14 @@ final class SkillStore implements AutoCloseable {
     }
 
     private Path resolveSkill(String name) throws IOException {
+        Path skill = resolveSkillPath(name);
+        if (!Files.isRegularFile(skill) || Files.isSymbolicLink(skill)) {
+            throw new IOException("Skill not found: " + name);
+        }
+        return skill;
+    }
+
+    private Path resolveSkillPath(String name) throws IOException {
         if (name == null || name.isBlank() || name.length() > 512 || name.indexOf('\\') >= 0) {
             throw new IOException("name must be a relative Markdown path in the MineGPT skills directory.");
         }
@@ -141,10 +180,50 @@ final class SkillStore implements AutoCloseable {
             throw new IOException("name must be a relative Markdown path in the MineGPT skills directory.");
         }
         Path skill = skillsDirectory.resolve(relativePath).normalize();
-        if (!skill.startsWith(skillsDirectory) || !Files.isRegularFile(skill) || Files.isSymbolicLink(skill)) {
-            throw new IOException("Skill not found: " + name);
+        if (!skill.startsWith(skillsDirectory)) {
+            throw new IOException("name must be a relative Markdown path in the MineGPT skills directory.");
         }
         return skill;
+    }
+
+    private void ensureSafeSkillDirectory(Path targetParent) throws IOException {
+        Path gameDirectory = gameDirectory();
+        if (gameDirectory == null || !targetParent.startsWith(skillsDirectory)) {
+            throw new IOException("Minecraft game directory is unavailable.");
+        }
+        Path realGameDirectory = gameDirectory.toRealPath();
+        Path current = skillsDirectory;
+        Path relativeParent = skillsDirectory.relativize(targetParent);
+        if (!Files.exists(current, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(current)
+                || !current.toRealPath().startsWith(realGameDirectory)) {
+            throw new IOException("MineGPT skills directory must stay inside the active game directory.");
+        }
+        for (Path segment : relativeParent) {
+            current = current.resolve(segment);
+            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
+                if (Files.isSymbolicLink(current) || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
+                    throw new IOException("Skill parent directories must not be symbolic links or files.");
+                }
+            } else {
+                Files.createDirectory(current);
+            }
+        }
+    }
+
+    private static void moveImportedSkill(Path temporary, Path target, boolean overwrite) throws IOException {
+        try {
+            if (overwrite) {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+            }
+        } catch (AtomicMoveNotSupportedException exception) {
+            if (overwrite) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Files.move(temporary, target);
+            }
+        }
     }
 
     private String relativeName(Path skill) {

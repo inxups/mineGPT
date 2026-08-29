@@ -58,4 +58,17 @@ class MineGPTSkillTest {
         skills.initialize();
         assertThrows(java.io.IOException.class, () -> skills.read("../outside.md"));
     }
+
+    @Test
+    void importsMarkdownSkillsWithoutReplacingExistingFilesByDefault() throws Exception {
+        SkillStore skills = new SkillStore(temporaryDirectory);
+        skills.initialize();
+
+        skills.writeImportedSkill("imported/guide.md", "# Imported skill\n".getBytes(java.nio.charset.StandardCharsets.UTF_8), false);
+        assertTrue(skills.read("imported/guide.md").contains("Imported skill"));
+        assertThrows(java.nio.file.FileAlreadyExistsException.class,
+                () -> skills.writeImportedSkill("imported/guide.md", "# Changed\n".getBytes(java.nio.charset.StandardCharsets.UTF_8), false));
+        skills.writeImportedSkill("imported/guide.md", "# Changed\n".getBytes(java.nio.charset.StandardCharsets.UTF_8), true);
+        assertTrue(skills.read("imported/guide.md").contains("Changed"));
+    }
 }

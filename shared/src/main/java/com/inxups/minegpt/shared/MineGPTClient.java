@@ -119,6 +119,26 @@ public final class MineGPTClient implements AutoCloseable {
                 + bridge.pendingCount() + " message(s) waiting locally.");
     }
 
+    /** Starts a local public-GitHub skill import without blocking Minecraft's render thread. */
+    public void importGitHubSkillUrl(String githubUrl, String destinationPath) {
+        platform.showLocalMessage("[MineGPT] Downloading GitHub skill...");
+        Thread.ofVirtual().name("minegpt-github-skill-import").start(() -> {
+            try {
+                SkillFileInstaller.ImportedSkill imported = SkillFileInstaller.importGitHubSkillUrl(
+                        platform.gameDirectory(), githubUrl, destinationPath);
+                platform.executeOnClientThread(() -> platform.showLocalMessage(
+                        "[MineGPT] Installed skill: " + imported.installedPath()));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                platform.executeOnClientThread(() -> platform.showLocalMessage("[MineGPT] GitHub skill download was interrupted."));
+            } catch (Exception exception) {
+                String detail = exception.getMessage() == null ? "unknown error" : exception.getMessage();
+                platform.executeOnClientThread(() -> platform.showLocalMessage(
+                        "[MineGPT] Could not install GitHub skill: " + detail));
+            }
+        });
+    }
+
     @Override
     public void close() {
         bridge.close();

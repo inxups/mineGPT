@@ -62,9 +62,18 @@ public final class MineGPTFabricClient implements ClientModInitializer {
                                 .executes(context -> {
                                     mineGPT.showStatus();
                                     return 1;
-                                }))));
+                                }))
+                        .then(ClientCommandManager.literal("github")
+                                .then(ClientCommandManager.argument("github_url", StringArgumentType.greedyString())
+                                        .executes(this::importGitHubSkill)))));
         mineGPT.start();
         LOGGER.info("MineGPT Fabric client initialized");
+    }
+
+    private int importGitHubSkill(com.mojang.brigadier.context.CommandContext<?> context) {
+        mineGPT.importGitHubSkillUrl(
+                StringArgumentType.getString(context, "github_url"), null);
+        return 1;
     }
 
     private static final class FabricPlatform implements ClientPlatform {
