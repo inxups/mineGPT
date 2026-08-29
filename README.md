@@ -72,6 +72,20 @@ The Bridge distribution is written to
 The MCP server also provides these instructions during initialization. The
 explicit prompt makes the desired long-running workflow clear to the agent.
 
+On its first start, the Bridge creates a user-editable skills directory and a
+default guide without overwriting existing files:
+
+- macOS: `~/Library/Application Support/minecraft/minegpt/skills/`
+- Linux: `~/.minecraft/minegpt/skills/`
+- Windows: `%APPDATA%\\.minecraft\\minegpt\\skills\\`
+
+Put Markdown skill files in this directory. ChatGPT Desktop does not scan local
+folders itself; MineGPT makes the folder available with `minegpt_list_skills()`
+and `minegpt_get_skill(name)`. The server instructions tell ChatGPT to list and
+load relevant skills at the start of a MineGPT task. For custom launchers, set
+the Bridge JVM property `minegpt.minecraftDir` or environment variable
+`MINEGPT_MINECRAFT_DIR` to that instance's Minecraft directory.
+
 ## In-Game Use
 
 - Type `@ai <message>` in the normal Minecraft chat box. MineGPT intercepts it
@@ -90,6 +104,10 @@ token in its normal `config/minegpt.json` file.
 
 - `minegpt_status()` returns the Bridge connection and queue state.
 - `minegpt_pairing_code()` returns the local host, port, and pairing token.
+- `minegpt_list_skills()` lists Markdown skills in the local Minecraft
+  `minegpt/skills` directory.
+- `minegpt_get_skill(name?)` reads one listed Markdown skill; omitting `name`
+  loads the default `minegpt-guide.md`.
 - `minegpt_get_chunk_info(chunk_x?, chunk_z?)` returns a read-only snapshot of a
   single chunk already loaded by the client. Omitting both coordinates reads the
   player's current chunk; otherwise provide both chunk coordinates. It returns

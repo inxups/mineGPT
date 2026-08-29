@@ -11,6 +11,7 @@ import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
 import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.modelcontextprotocol.spec.McpSchema;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -18,19 +19,28 @@ import java.util.Optional;
 
 /** Registers the MCP tools used by the ChatGPT Desktop listening conversation. */
 final class MineGptMcpServer {
-    private static final String INSTRUCTIONS = "MineGPT bridges a live local Minecraft chat. When asked to listen, call minegpt_next_message with wait_seconds 45. For every player_message, answer the player, call minegpt_reply with its exact message_id, then immediately listen again. Do not claim delivery unless minegpt_reply succeeds. World and player tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
-
     private final LoopbackBridgeServer bridge;
+    private final SkillStore skills;
 
     MineGptMcpServer(LoopbackBridgeServer bridge) {
+        this(bridge, new SkillStore());
+    }
+
+    MineGptMcpServer(LoopbackBridgeServer bridge, SkillStore skills) {
         this.bridge = bridge;
+        this.skills = skills;
+        try {
+            skills.initialize();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not initialize MineGPT skill directory.", exception);
+        }
     }
 
     McpSyncServer start() {
         StdioServerTransportProvider transport = new StdioServerTransportProvider(McpJsonDefaults.getMapper());
         return McpServer.sync(transport)
                 .serverInfo("minegpt", "0.1.0")
-                .instructions(INSTRUCTIONS)
+                .instructions(instructions())
                 .toolCall(tool("minegpt_status", "Return MineGPT bridge connection and queue status.", Map.of()),
                         (exchange, request) -> success(ProtocolCodec.toJson(bridge.status())))
                 .toolCall(tool("minegpt_pairing_code", "Return the one-time pairing token for the Minecraft client.", Map.of()),
@@ -38,6 +48,10 @@ final class MineGptMcpServer {
                                 "host", "127.0.0.1",
                                 "port", bridge.port(),
                                 "token", bridgeToken()))))
+                .toolCall(tool("minegpt_list_skills", "List user-editable MineGPT Markdown skills from the local Minecraft minegpt/skills directory.", Map.of()),
+                        (exchange, request) -> listSkills())
+                .toolCall(tool("minegpt_get_skill", "Read one Markdown skill from the local Minecraft minegpt/skills directory. Call minegpt_list_skills first to discover valid names.", skillSchema()),
+                        (exchange, request) -> getSkill(request.arguments()))
                 .toolCall(tool("minegpt_get_chunk_info", "Read a 16 by 16 surface summary of one chunk already loaded by the Minecraft client. Omit both coordinates for the player's current chunk. This never loads a chunk.", chunkSchema()),
                         (exchange, request) -> chunkInfo(request.arguments()))
                 .toolCall(tool("minegpt_get_player_state", "Read the player's current position, health, hunger, experience, game mode, and dimension.", Map.of()),
@@ -64,6 +78,34 @@ final class MineGptMcpServer {
     private String bridgeToken() {
         // Only the MCP host can invoke this local STDIO tool; the socket itself never exposes its token.
         return MineGptBridgeMain.token();
+    }
+
+    private String instructions() {
+        return "MineGPT bridges a local Minecraft client. User-editable Markdown skills live in "
+                + skills.directory() + ". At the start of a MineGPT task, call minegpt_list_skills and load the skill relevant to the player's request with minegpt_get_skill. "
+                + "A default minegpt-guide.md is created if missing. Game-data tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
+    }
+
+    private McpSchema.CallToolResult listSkills() {
+        try {
+            return success(ProtocolCodec.toJson(Map.of(
+                    "skills_directory", skills.directory().toString(),
+                    "skills", skills.list())));
+        } catch (Exception exception) {
+            return failure("Could not list MineGPT skills: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult getSkill(Map<String, Object> arguments) {
+        String name = stringArgument(arguments, "name");
+        if (name == null || name.isBlank()) {
+            name = SkillStore.DEFAULT_SKILL_FILE;
+        }
+        try {
+            return success(skills.read(name));
+        } catch (Exception exception) {
+            return failure("Could not read MineGPT skill: " + exception.getMessage());
+        }
     }
 
     private McpSchema.CallToolResult nextMessage(Map<String, Object> arguments) {
@@ -219,6 +261,12 @@ final class MineGptMcpServer {
         return Map.of(
                 "chunk_x", Map.of("type", "integer", "description", "Chunk X coordinate. Omit with chunk_z to use the player chunk."),
                 "chunk_z", Map.of("type", "integer", "description", "Chunk Z coordinate. Omit with chunk_x to use the player chunk."));
+    }
+
+    private static Map<String, Object> skillSchema() {
+        return Map.of("name", Map.of(
+                "type", "string",
+                "description", "Exact Markdown filename returned by minegpt_list_skills; omit to load minegpt-guide.md."));
     }
 
     private static Map<String, Object> radiusSchema() {
