@@ -77,12 +77,14 @@ default guide without overwriting existing files. The directory is relative to
 the **actual game instance run directory reported by the client**:
 
 ```text
-<game run directory>/minegpt/skills/
+<instance directory>/.minecraft/minegpt/skills/
 ```
 
-For the development launchers in this repository that is `fabric/run/minegpt/skills/`
-or `neoforge/run/minegpt/skills/`. With a launcher using a normal Minecraft
-instance it is that instance's `.minecraft/minegpt/skills/` directory. This
+For the development launchers in this repository that is
+`fabric/run/.minecraft/minegpt/skills/` or
+`neoforge/run/.minecraft/minegpt/skills/`. With a launcher whose reported game
+directory already ends in `.minecraft`, it is that directory's
+`minegpt/skills/` child. This
 means each Prism, Modrinth, or development instance can have different skills.
 
 Put Markdown skill files in this directory. ChatGPT Desktop does not scan local

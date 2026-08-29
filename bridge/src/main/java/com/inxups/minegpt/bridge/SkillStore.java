@@ -23,7 +23,7 @@ final class SkillStore {
     }
 
     SkillStore(Path minecraftDirectory) {
-        skillsDirectory = minecraftDirectory.resolve("minegpt").resolve("skills");
+        skillsDirectory = skillsPath(minecraftDirectory);
     }
 
     Path directory() {
@@ -34,8 +34,16 @@ final class SkillStore {
         if (minecraftDirectory == null || !minecraftDirectory.isAbsolute()) {
             return;
         }
-        skillsDirectory = minecraftDirectory.toAbsolutePath().normalize().resolve("minegpt").resolve("skills");
+        skillsDirectory = skillsPath(minecraftDirectory);
         initialize();
+    }
+
+    private static Path skillsPath(Path instanceDirectory) {
+        Path normalized = instanceDirectory.toAbsolutePath().normalize();
+        Path minecraftDirectory = ".minecraft".equalsIgnoreCase(String.valueOf(normalized.getFileName()))
+                ? normalized
+                : normalized.resolve(".minecraft");
+        return minecraftDirectory.resolve("minegpt").resolve("skills");
     }
 
     void initialize() throws IOException {
