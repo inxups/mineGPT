@@ -2,6 +2,10 @@ package com.inxups.minegpt.bridge;
 
 import com.inxups.minegpt.shared.PlayerMessage;
 import com.inxups.minegpt.shared.BridgeEndpoint;
+import com.inxups.minegpt.shared.ChunkInfo;
+import com.inxups.minegpt.shared.ChunkQuery;
+import com.inxups.minegpt.shared.GameQuery;
+import com.inxups.minegpt.shared.GameQueryResult;
 import com.inxups.minegpt.shared.ProtocolCodec;
 import com.inxups.minegpt.shared.ProtocolMessage;
 import java.io.BufferedReader;
@@ -9,14 +13,19 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -26,6 +35,8 @@ final class LoopbackBridgeServer implements AutoCloseable {
     private final String token;
     private final ExecutorService clients = Executors.newVirtualThreadPerTaskExecutor();
     private final AtomicReference<ClientConnection> activeConnection = new AtomicReference<>();
+    private final ConcurrentHashMap<String, CompletableFuture<ChunkInfo>> pendingChunkRequests = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<GameQueryResult>> pendingGameQueries = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean();
     private ServerSocket serverSocket;
     private Thread acceptThread;
@@ -39,7 +50,10 @@ final class LoopbackBridgeServer implements AutoCloseable {
         if (running.get()) {
             return;
         }
-        serverSocket = new ServerSocket(requestedPort, 16, BridgeEndpoint.address());
+        ServerSocket socket = new ServerSocket();
+        socket.setReuseAddress(true);
+        socket.bind(new InetSocketAddress(BridgeEndpoint.address(), requestedPort), 16);
+        serverSocket = socket;
         running.set(true);
         acceptThread = Thread.ofVirtual().name("minegpt-bridge-accept").start(this::acceptLoop);
     }
@@ -74,6 +88,59 @@ final class LoopbackBridgeServer implements AutoCloseable {
             connection.close();
             queue.release(messageId);
             return false;
+        }
+    }
+
+    /**
+     * Requests a snapshot from the Minecraft client without loading a new chunk. The socket
+     * protocol is asynchronous, while MCP tool invocations are synchronous, so this method
+     * bounds the wait rather than allowing a disconnected game to hold a tool call indefinitely.
+     */
+    ChunkInfo readChunkInfo(ChunkQuery query) {
+        if (query == null || !query.isValid()) {
+            return ChunkInfo.unavailable("Provide both chunk_x and chunk_z, or neither to use the player chunk.");
+        }
+        ClientConnection connection = activeConnection.get();
+        if (connection == null) {
+            return ChunkInfo.unavailable("Minecraft client is not connected to the local bridge.");
+        }
+        String requestId = UUID.randomUUID().toString();
+        CompletableFuture<ChunkInfo> response = new CompletableFuture<>();
+        pendingChunkRequests.put(requestId, response);
+        try {
+            connection.send(ProtocolMessage.chunkInfoRequest(requestId, query));
+            return response.get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return ChunkInfo.unavailable("Chunk query was interrupted.");
+        } catch (Exception exception) {
+            return ChunkInfo.unavailable("Minecraft did not answer the chunk query within 5 seconds.");
+        } finally {
+            pendingChunkRequests.remove(requestId);
+        }
+    }
+
+    GameQueryResult readGameQuery(GameQuery query) {
+        if (query == null || query.kind() == null || query.kind().isBlank()) {
+            return GameQueryResult.unavailable("Invalid game-data query.");
+        }
+        ClientConnection connection = activeConnection.get();
+        if (connection == null) {
+            return GameQueryResult.unavailable("Minecraft client is not connected to the local bridge.");
+        }
+        String requestId = UUID.randomUUID().toString();
+        CompletableFuture<GameQueryResult> response = new CompletableFuture<>();
+        pendingGameQueries.put(requestId, response);
+        try {
+            connection.send(ProtocolMessage.gameQueryRequest(requestId, query));
+            return response.get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return GameQueryResult.unavailable("Game-data query was interrupted.");
+        } catch (Exception exception) {
+            return GameQueryResult.unavailable("Minecraft did not answer the game-data query within 5 seconds.");
+        } finally {
+            pendingGameQueries.remove(requestId);
         }
     }
 
@@ -112,6 +179,14 @@ final class LoopbackBridgeServer implements AutoCloseable {
             String line;
             while ((line = reader.readLine()) != null) {
                 ProtocolMessage message = ProtocolCodec.decode(line);
+                if ("chunk_info_response".equals(message.type())) {
+                    completeChunkRequest(message);
+                    continue;
+                }
+                if ("game_query_response".equals(message.type())) {
+                    completeGameQuery(message);
+                    continue;
+                }
                 if (!"player_message".equals(message.type()) || message.message() == null
                         || !message.message().id().equals(message.messageId())) {
                     connection.send(ProtocolMessage.error("Invalid Minecraft message."));
@@ -137,6 +212,26 @@ final class LoopbackBridgeServer implements AutoCloseable {
         }
     }
 
+    private void completeChunkRequest(ProtocolMessage message) {
+        if (message.requestId() == null || message.chunkInfo() == null) {
+            return;
+        }
+        CompletableFuture<ChunkInfo> request = pendingChunkRequests.remove(message.requestId());
+        if (request != null) {
+            request.complete(message.chunkInfo());
+        }
+    }
+
+    private void completeGameQuery(ProtocolMessage message) {
+        if (message.requestId() == null || message.gameQueryResult() == null) {
+            return;
+        }
+        CompletableFuture<GameQueryResult> request = pendingGameQueries.remove(message.requestId());
+        if (request != null) {
+            request.complete(message.gameQueryResult());
+        }
+    }
+
     private static void write(BufferedWriter writer, ProtocolMessage message) throws IOException {
         writer.write(ProtocolCodec.encode(message));
         writer.newLine();
@@ -152,6 +247,12 @@ final class LoopbackBridgeServer implements AutoCloseable {
         if (connection != null) {
             connection.close();
         }
+        pendingChunkRequests.forEach((requestId, request) ->
+                request.complete(ChunkInfo.unavailable("MineGPT bridge stopped.")));
+        pendingChunkRequests.clear();
+        pendingGameQueries.forEach((requestId, request) ->
+                request.complete(GameQueryResult.unavailable("MineGPT bridge stopped.")));
+        pendingGameQueries.clear();
         try {
             serverSocket.close();
         } catch (IOException ignored) {

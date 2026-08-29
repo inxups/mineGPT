@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.inxups.minegpt.shared.BridgeEndpoint;
+import com.inxups.minegpt.shared.ChunkInfo;
+import com.inxups.minegpt.shared.ChunkQuery;
+import com.inxups.minegpt.shared.GameQuery;
+import com.inxups.minegpt.shared.GameQueryResult;
 import com.inxups.minegpt.shared.PlayerContext;
 import com.inxups.minegpt.shared.PlayerMessage;
 import com.inxups.minegpt.shared.ProtocolCodec;
@@ -16,6 +20,8 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -54,6 +60,65 @@ class LoopbackBridgeServerTest {
                 assertEquals("reply", reply.type());
                 assertEquals(message.id(), reply.messageId());
                 assertEquals("Look below y=16.", reply.text());
+            }
+        }
+    }
+
+    @Test
+    void requestsAChunkSnapshotFromTheConnectedMinecraftClient() throws Exception {
+        BridgeStateStore state = new BridgeStateStore(temporaryDirectory.resolve("bridge-state.json"));
+        PendingMessageQueue queue = new PendingMessageQueue(state);
+        try (LoopbackBridgeServer server = new LoopbackBridgeServer(queue, state.token())) {
+            server.start(0);
+            try (Socket client = new Socket(BridgeEndpoint.address(), server.port());
+                 BufferedReader reader = reader(client);
+                 BufferedWriter writer = writer(client)) {
+                send(writer, ProtocolMessage.hello(state.token()));
+                assertEquals("hello_accepted", receive(reader).type());
+
+                CompletableFuture<ChunkInfo> result = CompletableFuture.supplyAsync(
+                        () -> server.readChunkInfo(new ChunkQuery(4, -2)));
+                ProtocolMessage request = receive(reader);
+                assertEquals("chunk_info_request", request.type());
+                assertEquals(new ChunkQuery(4, -2), request.chunkQuery());
+
+                ChunkInfo expected = new ChunkInfo(true, null, "minecraft:overworld", 4, -2,
+                        1200L, -64, 320, new int[256], new String[256]);
+                send(writer, ProtocolMessage.chunkInfoResponse(request.requestId(), expected));
+                ChunkInfo received = result.get(2, TimeUnit.SECONDS);
+                assertTrue(received.loaded());
+                assertEquals("minecraft:overworld", received.dimension());
+                assertEquals(4, received.chunkX());
+                assertEquals(-2, received.chunkZ());
+                assertEquals(256, received.surfaceHeights().length);
+                assertEquals(256, received.surfaceBlocks().length);
+            }
+        }
+    }
+
+    @Test
+    void requestsBoundedGameDataFromTheConnectedMinecraftClient() throws Exception {
+        BridgeStateStore state = new BridgeStateStore(temporaryDirectory.resolve("bridge-state.json"));
+        PendingMessageQueue queue = new PendingMessageQueue(state);
+        try (LoopbackBridgeServer server = new LoopbackBridgeServer(queue, state.token())) {
+            server.start(0);
+            try (Socket client = new Socket(BridgeEndpoint.address(), server.port());
+                 BufferedReader reader = reader(client);
+                 BufferedWriter writer = writer(client)) {
+                send(writer, ProtocolMessage.hello(state.token()));
+                assertEquals("hello_accepted", receive(reader).type());
+
+                CompletableFuture<GameQueryResult> result = CompletableFuture.supplyAsync(
+                        () -> server.readGameQuery(GameQuery.playerState()));
+                ProtocolMessage request = receive(reader);
+                assertEquals("game_query_request", request.type());
+                assertEquals("player_state", request.gameQuery().kind());
+
+                send(writer, ProtocolMessage.gameQueryResponse(request.requestId(),
+                        GameQueryResult.available(java.util.Map.of("health", 20, "hunger", 20))));
+                GameQueryResult received = result.get(2, TimeUnit.SECONDS);
+                assertTrue(received.available());
+                assertTrue(received.dataJson().contains("\"health\":20"));
             }
         }
     }

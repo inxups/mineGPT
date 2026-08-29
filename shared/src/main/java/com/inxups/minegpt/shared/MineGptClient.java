@@ -21,6 +21,32 @@ public final class MineGptClient implements AutoCloseable {
             }
 
             @Override
+            public void onChunkInfoRequest(String requestId, ChunkQuery query) {
+                platform.executeOnClientThread(() -> {
+                    ChunkInfo info;
+                    try {
+                        info = platform.readChunkInfo(query);
+                    } catch (RuntimeException exception) {
+                        info = ChunkInfo.unavailable("Minecraft could not read the chunk: " + exception.getMessage());
+                    }
+                    bridge.respondToChunkInfo(requestId, info);
+                });
+            }
+
+            @Override
+            public void onGameQueryRequest(String requestId, GameQuery query) {
+                platform.executeOnClientThread(() -> {
+                    GameQueryResult result;
+                    try {
+                        result = platform.readGameQuery(query);
+                    } catch (RuntimeException exception) {
+                        result = GameQueryResult.unavailable("Minecraft could not read game data: " + exception.getMessage());
+                    }
+                    bridge.respondToGameQuery(requestId, result);
+                });
+            }
+
+            @Override
             public void onBridgeError(String detail) {
                 platform.executeOnClientThread(() -> platform.showLocalMessage("[MineGPT] " + detail));
             }

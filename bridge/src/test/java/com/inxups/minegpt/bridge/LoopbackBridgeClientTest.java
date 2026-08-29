@@ -3,6 +3,8 @@ package com.inxups.minegpt.bridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.inxups.minegpt.shared.LoopbackBridgeClient;
+import com.inxups.minegpt.shared.ChunkQuery;
+import com.inxups.minegpt.shared.GameQuery;
 import com.inxups.minegpt.shared.PlayerContext;
 import com.inxups.minegpt.shared.PlayerMessage;
 import java.nio.file.Path;
@@ -37,6 +39,16 @@ class LoopbackBridgeClientTest {
                     } else if ("second reply".equals(text)) {
                         secondReply.countDown();
                     }
+                }
+
+                @Override
+                public void onChunkInfoRequest(String requestId, ChunkQuery query) {
+                    throw new AssertionError("Unexpected chunk query in this test");
+                }
+
+                @Override
+                public void onGameQueryRequest(String requestId, GameQuery query) {
+                    throw new AssertionError("Unexpected game query in this test");
                 }
 
                 @Override

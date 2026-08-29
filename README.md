@@ -90,6 +90,26 @@ token in its normal `config/minegpt.json` file.
 
 - `minegpt_status()` returns the Bridge connection and queue state.
 - `minegpt_pairing_code()` returns the local host, port, and pairing token.
+- `minegpt_get_chunk_info(chunk_x?, chunk_z?)` returns a read-only snapshot of a
+  single chunk already loaded by the client. Omitting both coordinates reads the
+  player's current chunk; otherwise provide both chunk coordinates. It returns
+  the dimension, game time, build-height range, and 256 surface heights and
+  block IDs in row-major `local_z * 16 + local_x` order. It never asks the
+  Minecraft server to load a chunk. An unloaded chunk returns `loaded: false`.
+- `minegpt_get_player_state()` returns the current player position, dimension,
+  health, hunger, experience, and game mode.
+- `minegpt_get_target()` returns the block or entity under the crosshair.
+- `minegpt_get_inventory()` returns non-empty hotbar, main-inventory, armor,
+  and offhand slots with item IDs, counts, and durability; item NBT is omitted.
+- `minegpt_get_nearby_entities(radius?)` returns at most 64 client-visible
+  entities within a radius of 1--64 blocks (default 32).
+- `minegpt_get_block(x, y, z)` returns one already loaded block's ID, state,
+  light, and block-entity type. It does not load the containing chunk.
+- `minegpt_get_chunk_section(chunk_x, chunk_z, section_y)` returns counts of
+  up to 64 block IDs in one already loaded 16 by 16 by 16 section; `section_y`
+  is the vertical section coordinate, not a block Y coordinate.
+- `minegpt_get_biome_and_environment()` returns the player's biome, world time,
+  moon phase, weather, difficulty, and local block/sky light.
 - `minegpt_next_message(wait_seconds)` reads the oldest unhandled player
   message and waits no longer than 45 seconds.
 - `minegpt_reply(message_id, text)` displays a reply locally in Minecraft.
@@ -99,3 +119,8 @@ messages while its ChatGPT Desktop process is running but the listening task is
 between tool calls. If the Bridge itself is not running, the Mod reports that
 the local Bridge is unavailable and retains up to 200 unsent messages in memory
 until it reconnects or Minecraft closes.
+
+All read tools are bounded and only access data the local client already knows.
+MineGPT does not expose item/block-entity NBT, full chat history, or chunks the
+client has not loaded. A disconnected client or unavailable data produces a
+structured `available: false` result rather than loading or modifying anything.

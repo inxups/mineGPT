@@ -25,6 +25,10 @@ public final class LoopbackBridgeClient implements AutoCloseable {
     public interface Listener {
         void onReply(String messageId, String text);
 
+        void onChunkInfoRequest(String requestId, ChunkQuery query);
+
+        void onGameQueryRequest(String requestId, GameQuery query);
+
         void onBridgeError(String detail);
 
         void onConnectionChanged(boolean connected);
@@ -33,6 +37,7 @@ public final class LoopbackBridgeClient implements AutoCloseable {
     private final Listener listener;
     private final int port;
     private final LinkedBlockingDeque<ProtocolMessage> pending = new LinkedBlockingDeque<>(MAX_PENDING_MESSAGES);
+    private final LinkedBlockingDeque<ProtocolMessage> responses = new LinkedBlockingDeque<>(16);
     private final AtomicReference<String> token = new AtomicReference<>();
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean connected = new AtomicBoolean();
@@ -59,6 +64,20 @@ public final class LoopbackBridgeClient implements AutoCloseable {
 
     public boolean submit(PlayerMessage message) {
         return pending.offerLast(ProtocolMessage.playerMessage(message));
+    }
+
+    /** Queues a response to a Bridge-initiated read-only world query. */
+    public void respondToChunkInfo(String requestId, ChunkInfo info) {
+        if (requestId != null && info != null && !responses.offerLast(ProtocolMessage.chunkInfoResponse(requestId, info))) {
+            listener.onBridgeError("Too many pending world-query responses.");
+        }
+    }
+
+    /** Queues a response to a Bridge-initiated, bounded game-data query. */
+    public void respondToGameQuery(String requestId, GameQueryResult result) {
+        if (requestId != null && result != null && !responses.offerLast(ProtocolMessage.gameQueryResponse(requestId, result))) {
+            listener.onBridgeError("Too many pending game-query responses.");
+        }
     }
 
     public int pendingCount() {
@@ -115,6 +134,10 @@ public final class LoopbackBridgeClient implements AutoCloseable {
     private void sendUntilDisconnected(BufferedReader reader, BufferedWriter writer) throws IOException {
         ProtocolMessage awaitingAcknowledgement = null;
         while (running.get() && !Thread.currentThread().isInterrupted()) {
+            ProtocolMessage response;
+            while ((response = responses.pollFirst()) != null) {
+                write(writer, response);
+            }
             if (awaitingAcknowledgement == null) {
                 awaitingAcknowledgement = pending.peekFirst();
                 if (awaitingAcknowledgement != null) {
@@ -133,6 +156,12 @@ public final class LoopbackBridgeClient implements AutoCloseable {
                     awaitingAcknowledgement = null;
                 } else if ("reply".equals(incoming.type())) {
                     listener.onReply(incoming.messageId(), incoming.text());
+                } else if ("chunk_info_request".equals(incoming.type()) && incoming.requestId() != null
+                        && incoming.chunkQuery() != null) {
+                    listener.onChunkInfoRequest(incoming.requestId(), incoming.chunkQuery());
+                } else if ("game_query_request".equals(incoming.type()) && incoming.requestId() != null
+                        && incoming.gameQuery() != null) {
+                    listener.onGameQueryRequest(incoming.requestId(), incoming.gameQuery());
                 } else if ("error".equals(incoming.type())) {
                     listener.onBridgeError(incoming.detail() == null ? "Bridge rejected a message." : incoming.detail());
                     if (awaitingAcknowledgement != null) {
