@@ -20,6 +20,7 @@ import java.util.Optional;
 final class MineGPTMcpServer {
     private final LoopbackBridgeServer bridge;
     private final SkillStore skills;
+    private final GameDirectoryStore gameFiles;
 
     MineGPTMcpServer(LoopbackBridgeServer bridge) {
         this(bridge, new SkillStore());
@@ -28,6 +29,7 @@ final class MineGPTMcpServer {
     MineGPTMcpServer(LoopbackBridgeServer bridge, SkillStore skills) {
         this.bridge = bridge;
         this.skills = skills;
+        this.gameFiles = new GameDirectoryStore(skills);
     }
 
     McpSyncServer start() {
@@ -46,6 +48,18 @@ final class MineGPTMcpServer {
                         (exchange, request) -> listSkills())
                 .toolCall(tool("minegpt_get_skill", "Read one Markdown skill from the local Minecraft minegpt/skills directory. Call minegpt_list_skills first and pass its relative path.", skillSchema()),
                         (exchange, request) -> getSkill(request.arguments()))
+                .toolCall(tool("minegpt_list_game_files", "Recursively list files and directories in the active Minecraft game directory without leaving it. Results are capped at 500 entries.", gameFileListSchema()),
+                        (exchange, request) -> listGameFiles(request.arguments()))
+                .toolCall(tool("minegpt_read_game_file", "Read a bounded byte range from a regular file in the active Minecraft game directory as UTF-8 text or Base64.", gameFileReadSchema()),
+                        (exchange, request) -> readGameFile(request.arguments()))
+                .toolCall(tool("minegpt_get_game_options", "Read and parse the active instance's options.txt client settings.", Map.of()),
+                        (exchange, request) -> gameOptions())
+                .toolCall(tool("minegpt_list_installed_mods", "List .jar files directly in the active instance's mods directory.", Map.of()),
+                        (exchange, request) -> installedMods())
+                .toolCall(tool("minegpt_list_saved_worlds", "List direct child world directories in the active instance's saves directory.", Map.of()),
+                        (exchange, request) -> savedWorlds())
+                .toolCall(tool("minegpt_get_recent_log", "Read the tail of logs/latest.log from the active instance, up to 1000 lines.", recentLogSchema()),
+                        (exchange, request) -> recentLog(request.arguments()))
                 .toolCall(tool("minegpt_get_chunk_info", "Read a 16 by 16 surface summary of one chunk already loaded by the Minecraft client. Omit both coordinates for the player's current chunk. This never loads a chunk.", chunkSchema()),
                         (exchange, request) -> chunkInfo(request.arguments()))
                 .toolCall(tool("minegpt_get_player_state", "Read the player's current position, health, hunger, experience, game mode, and dimension.", Map.of()),
@@ -75,9 +89,9 @@ final class MineGPTMcpServer {
     }
 
     private String instructions() {
-        return "MineGPT bridges a local Minecraft client. User-editable Markdown skills live in "
-                + "<active game run directory>/minegpt/skills after the client handshake. At the start of a MineGPT task, call minegpt_list_skills and load the skill relevant to the player's request with minegpt_get_skill. "
-                + "A default minegpt-guide.md is created after Minecraft reports its game directory. Game-data tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
+        return "MineGPT bridges a local Minecraft client. The active game directory is available through read-only file tools after the client handshake. "
+                + "User-editable Markdown skills live in <active game run directory>/minegpt/skills and are optional workflows: call minegpt_list_skills only when a relevant skill is needed. "
+                + "Game-data tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
     }
 
     private McpSchema.CallToolResult listSkills() {
@@ -99,6 +113,77 @@ final class MineGPTMcpServer {
             return success(skills.read(name));
         } catch (Exception exception) {
             return failure("Could not read MineGPT skill: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult listGameFiles(Map<String, Object> arguments) {
+        if (!isOptionalInteger(arguments, "max_depth")) {
+            return failure("max_depth must be an integer when provided.");
+        }
+        String path = stringArgument(arguments, "path");
+        if (!isOptionalString(arguments, "path")) {
+            return failure("path must be a string when provided.");
+        }
+        int depth = optionalIntegerArgument(arguments, "max_depth") == null ? 3
+                : optionalIntegerArgument(arguments, "max_depth");
+        try {
+            return success(ProtocolCodec.toJson(gameFiles.list(path, depth)));
+        } catch (Exception exception) {
+            return failure("Could not list Minecraft game files: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult readGameFile(Map<String, Object> arguments) {
+        String path = stringArgument(arguments, "path");
+        if (path == null || path.isBlank() || !isOptionalString(arguments, "path")
+                || !isOptionalLong(arguments, "offset") || !isOptionalInteger(arguments, "max_bytes")
+                || !isOptionalString(arguments, "encoding")) {
+            return failure("path is required; offset and max_bytes must be integers; encoding must be a string.");
+        }
+        long offset = optionalLongArgument(arguments, "offset") == null ? 0L : optionalLongArgument(arguments, "offset");
+        Integer maxBytes = optionalIntegerArgument(arguments, "max_bytes");
+        String encoding = stringArgument(arguments, "encoding");
+        try {
+            return success(ProtocolCodec.toJson(gameFiles.read(path, offset, maxBytes, encoding)));
+        } catch (Exception exception) {
+            return failure("Could not read Minecraft game file: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult gameOptions() {
+        try {
+            return success(ProtocolCodec.toJson(gameFiles.options()));
+        } catch (Exception exception) {
+            return failure("Could not read Minecraft options: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult installedMods() {
+        try {
+            return success(ProtocolCodec.toJson(gameFiles.installedMods()));
+        } catch (Exception exception) {
+            return failure("Could not list installed Mods: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult savedWorlds() {
+        try {
+            return success(ProtocolCodec.toJson(gameFiles.savedWorlds()));
+        } catch (Exception exception) {
+            return failure("Could not list saved Minecraft worlds: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult recentLog(Map<String, Object> arguments) {
+        if (!isOptionalInteger(arguments, "max_lines")) {
+            return failure("max_lines must be an integer when provided.");
+        }
+        int maxLines = optionalIntegerArgument(arguments, "max_lines") == null ? 200
+                : optionalIntegerArgument(arguments, "max_lines");
+        try {
+            return success(ProtocolCodec.toJson(gameFiles.recentLog(maxLines)));
+        } catch (Exception exception) {
+            return failure("Could not read the Minecraft log: " + exception.getMessage());
         }
     }
 
@@ -204,6 +289,11 @@ final class MineGPTMcpServer {
         return value;
     }
 
+    private static boolean isOptionalString(Map<String, Object> arguments, String name) {
+        return arguments == null || !arguments.containsKey(name) || arguments.get(name) == null
+                || arguments.get(name) instanceof String;
+    }
+
     private static boolean isOptionalInteger(Map<String, Object> arguments, String name) {
         if (arguments == null || !arguments.containsKey(name) || arguments.get(name) == null) {
             return true;
@@ -228,6 +318,25 @@ final class MineGPTMcpServer {
             return null;
         }
         return optionalIntegerArgument(arguments, name);
+    }
+
+    private static boolean isOptionalLong(Map<String, Object> arguments, String name) {
+        if (arguments == null || !arguments.containsKey(name) || arguments.get(name) == null) {
+            return true;
+        }
+        if (!(arguments.get(name) instanceof Number number)) {
+            return false;
+        }
+        double value = number.doubleValue();
+        return Double.isFinite(value) && value == Math.rint(value)
+                && value >= Long.MIN_VALUE && value <= Long.MAX_VALUE;
+    }
+
+    private static Long optionalLongArgument(Map<String, Object> arguments, String name) {
+        if (arguments == null || !(arguments.get(name) instanceof Number number)) {
+            return null;
+        }
+        return number.longValue();
     }
 
     private static boolean isBlockCoordinate(int coordinate) {
@@ -261,6 +370,27 @@ final class MineGPTMcpServer {
         return Map.of("name", Map.of(
                 "type", "string",
                 "description", "Exact relative Markdown path returned by minegpt_list_skills; omit to load minegpt-guide.md."));
+    }
+
+    private static Map<String, Object> gameFileListSchema() {
+        return Map.of(
+                "path", Map.of("type", "string", "description", "Optional relative directory path. Omit for the game directory root."),
+                "max_depth", Map.of("type", "integer", "minimum", 1, "maximum", GameDirectoryStore.MAX_LIST_DEPTH,
+                        "description", "Directory levels to scan below path. Defaults to 3."));
+    }
+
+    private static Map<String, Object> gameFileReadSchema() {
+        return Map.of(
+                "path", Map.of("type", "string", "description", "Required relative file path returned by minegpt_list_game_files."),
+                "offset", Map.of("type", "integer", "minimum", 0, "description", "Byte offset. Defaults to zero."),
+                "max_bytes", Map.of("type", "integer", "minimum", 1, "maximum", GameDirectoryStore.MAX_READ_BYTES,
+                        "description", "Maximum bytes to return. Defaults to 65536."),
+                "encoding", Map.of("type", "string", "enum", List.of("utf8", "base64"), "description", "Defaults to utf8."));
+    }
+
+    private static Map<String, Object> recentLogSchema() {
+        return Map.of("max_lines", Map.of("type", "integer", "minimum", 1, "maximum", 1_000,
+                "description", "Number of latest log lines to return. Defaults to 200."));
     }
 
     private static Map<String, Object> radiusSchema() {

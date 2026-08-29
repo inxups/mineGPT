@@ -42,6 +42,11 @@ final class SkillStore implements AutoCloseable {
         return skillsDirectory;
     }
 
+    Path gameDirectory() {
+        Path currentDirectory = skillsDirectory;
+        return currentDirectory == null ? null : currentDirectory.getParent().getParent();
+    }
+
     synchronized void setMinecraftDirectory(Path minecraftDirectory) throws IOException {
         if (minecraftDirectory == null || !minecraftDirectory.isAbsolute()) {
             return;

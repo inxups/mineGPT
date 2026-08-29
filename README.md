@@ -120,6 +120,19 @@ token in its normal `config/minegpt.json` file.
   `minegpt/skills` directory, including nested files up to eight levels deep.
 - `minegpt_get_skill(name?)` reads one listed Markdown skill by its relative
   path; omitting `name` loads the default `minegpt-guide.md`.
+- `minegpt_list_game_files(path?, max_depth?)` lists files and directories
+  under the active Minecraft instance directory. It accepts only relative paths,
+  scans up to eight levels below the requested directory, skips symlinks, and
+  returns at most 500 entries. Omit `path` to start at the instance root.
+- `minegpt_read_game_file(path, offset?, max_bytes?, encoding?)` reads any
+  regular file anywhere under the active instance directory in bounded chunks.
+  It returns UTF-8 text or Base64, with a default 64 KiB and maximum 256 KiB per
+  call; use `offset` to continue a larger file.
+- `minegpt_get_game_options()` parses the active instance's `options.txt`.
+- `minegpt_list_installed_mods()` lists Mod JARs in `mods/`, and
+  `minegpt_list_saved_worlds()` lists world directories in `saves/`.
+- `minegpt_get_recent_log(max_lines?)` returns the tail of `logs/latest.log`,
+  up to 1000 lines.
 - `minegpt_get_chunk_info(chunk_x?, chunk_z?)` returns a read-only snapshot of a
   single chunk already loaded by the client. Omitting both coordinates reads the
   player's current chunk; otherwise provide both chunk coordinates. It returns
@@ -150,7 +163,9 @@ between tool calls. If the Bridge itself is not running, the Mod reports that
 the local Bridge is unavailable and retains up to 200 unsent messages in memory
 until it reconnects or Minecraft closes.
 
-All read tools are bounded and only access data the local client already knows.
-MineGPT does not expose item/block-entity NBT, full chat history, or chunks the
-client has not loaded. A disconnected client or unavailable data produces a
-structured `available: false` result rather than loading or modifying anything.
+All read tools are bounded and read-only. Instance-file tools access only the
+active game run directory reported by the paired client; paths that resolve
+outside it are rejected. Minecraft live-data tools do not expose item/block-
+entity NBT, full chat history, or chunks the client has not loaded. A
+disconnected client or unavailable data produces a structured `available:
+false` result rather than loading or modifying anything.
