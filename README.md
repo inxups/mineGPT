@@ -92,8 +92,9 @@ and `minegpt_get_skill(name)`. The game client sends its run directory during
 the authenticated Bridge handshake, and the server instructions tell ChatGPT
 to list and load relevant skills at the start of a MineGPT task. For unusual
 launchers, the client reports its normal game directory; no server setting is
-required. The Bridge does not create a fallback skill directory before a client
-connects.
+required. After the client connects, the Bridge keeps the default
+`minegpt-guide.md` present and recreates it if it is deleted; custom skill files
+are never overwritten or regenerated.
 
 ## In-Game Use
 

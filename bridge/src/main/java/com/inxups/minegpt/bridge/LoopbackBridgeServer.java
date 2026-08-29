@@ -273,6 +273,7 @@ final class LoopbackBridgeServer implements AutoCloseable {
             // The server is already stopping.
         }
         clients.close();
+        skills.close();
         if (acceptThread != null) {
             acceptThread.interrupt();
         }

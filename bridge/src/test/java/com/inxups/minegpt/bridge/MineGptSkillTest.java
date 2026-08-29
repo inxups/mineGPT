@@ -23,6 +23,11 @@ class MineGptSkillTest {
         assertEquals(2, skills.list().size());
         assertEquals("Caving advice", skills.list().get(0).description());
         assertTrue(skills.read("caving.md").contains("# Caving"));
+
+        Path defaultSkill = temporaryDirectory.resolve("minegpt/skills/minegpt-guide.md");
+        Files.delete(defaultSkill);
+        skills.list();
+        assertTrue(Files.isRegularFile(defaultSkill));
     }
 
     @Test

@@ -9,21 +9,31 @@ import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /** User-editable Markdown skills stored alongside the active Minecraft instance. */
-final class SkillStore {
+final class SkillStore implements AutoCloseable {
     static final String DEFAULT_SKILL_FILE = "minegpt-guide.md";
     private static final long MAX_SKILL_BYTES = 32 * 1024;
 
     private volatile Path skillsDirectory;
+    private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "minegpt-skill-monitor");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     SkillStore() {
         skillsDirectory = null;
+        startMonitor();
     }
 
     SkillStore(Path minecraftDirectory) {
         skillsDirectory = skillsPath(minecraftDirectory);
+        startMonitor();
     }
 
     Path directory() {
@@ -42,7 +52,7 @@ final class SkillStore {
         return instanceDirectory.toAbsolutePath().normalize().resolve("minegpt").resolve("skills");
     }
 
-    void initialize() throws IOException {
+    synchronized void initialize() throws IOException {
         if (skillsDirectory == null) {
             throw new IOException("Minecraft client has not reported its game directory yet.");
         }
@@ -58,6 +68,18 @@ final class SkillStore {
             Files.writeString(defaultSkill, new String(input.readAllBytes(), StandardCharsets.UTF_8),
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);
         }
+    }
+
+    private void startMonitor() {
+        monitor.scheduleWithFixedDelay(() -> {
+            if (skillsDirectory != null) {
+                try {
+                    initialize();
+                } catch (IOException ignored) {
+                    // The directory may be temporarily unavailable while an instance is starting.
+                }
+            }
+        }, 2, 2, TimeUnit.SECONDS);
     }
 
     List<SkillSummary> list() throws IOException {
@@ -141,5 +163,10 @@ final class SkillStore {
     }
 
     record SkillSummary(String name, String description) {
+    }
+
+    @Override
+    public void close() {
+        monitor.shutdownNow();
     }
 }
