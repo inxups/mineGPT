@@ -19,7 +19,7 @@ final class SkillStore {
     private volatile Path skillsDirectory;
 
     SkillStore() {
-        this(resolveMinecraftDirectory());
+        skillsDirectory = null;
     }
 
     SkillStore(Path minecraftDirectory) {
@@ -47,6 +47,9 @@ final class SkillStore {
     }
 
     void initialize() throws IOException {
+        if (skillsDirectory == null) {
+            throw new IOException("Minecraft client has not reported its game directory yet.");
+        }
         Files.createDirectories(skillsDirectory);
         Path defaultSkill = skillsDirectory.resolve(DEFAULT_SKILL_FILE);
         if (Files.exists(defaultSkill)) {
@@ -62,6 +65,9 @@ final class SkillStore {
     }
 
     List<SkillSummary> list() throws IOException {
+        if (skillsDirectory == null) {
+            return List.of();
+        }
         initialize();
         try (Stream<Path> entries = Files.list(skillsDirectory)) {
             return entries
@@ -136,27 +142,6 @@ final class SkillStore {
 
     private static String limit(String value) {
         return value.length() <= 240 ? value : value.substring(0, 237) + "...";
-    }
-
-    private static Path resolveMinecraftDirectory() {
-        String configured = System.getProperty("minegpt.minecraftDir");
-        if (configured == null || configured.isBlank()) {
-            configured = System.getenv("MINEGPT_MINECRAFT_DIR");
-        }
-        if (configured != null && !configured.isBlank()) {
-            return Path.of(configured).toAbsolutePath().normalize();
-        }
-        Path home = Path.of(System.getProperty("user.home"));
-        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-        if (osName.contains("mac")) {
-            return home.resolve("Library").resolve("Application Support").resolve("minecraft");
-        }
-        if (osName.contains("win")) {
-            String appData = System.getenv("APPDATA");
-            return (appData == null || appData.isBlank() ? home.resolve("AppData").resolve("Roaming") : Path.of(appData))
-                    .resolve(".minecraft");
-        }
-        return home.resolve(".minecraft");
     }
 
     record SkillSummary(String name, String description) {

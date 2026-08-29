@@ -11,7 +11,6 @@ import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
 import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.modelcontextprotocol.spec.McpSchema;
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -29,11 +28,6 @@ final class MineGptMcpServer {
     MineGptMcpServer(LoopbackBridgeServer bridge, SkillStore skills) {
         this.bridge = bridge;
         this.skills = skills;
-        try {
-            skills.initialize();
-        } catch (IOException exception) {
-            throw new IllegalStateException("Could not initialize MineGPT skill directory.", exception);
-        }
     }
 
     McpSyncServer start() {
@@ -82,14 +76,14 @@ final class MineGptMcpServer {
 
     private String instructions() {
         return "MineGPT bridges a local Minecraft client. User-editable Markdown skills live in "
-                + skills.directory() + ". At the start of a MineGPT task, call minegpt_list_skills and load the skill relevant to the player's request with minegpt_get_skill. "
-                + "A default minegpt-guide.md is created if missing. Game-data tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
+                + "<active game directory>/.minecraft/minegpt/skills after the client handshake. At the start of a MineGPT task, call minegpt_list_skills and load the skill relevant to the player's request with minegpt_get_skill. "
+                + "A default minegpt-guide.md is created after Minecraft reports its game directory. Game-data tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
     }
 
     private McpSchema.CallToolResult listSkills() {
         try {
             return success(ProtocolCodec.toJson(Map.of(
-                    "skills_directory", skills.directory().toString(),
+                    "skills_directory", skills.directory() == null ? "waiting_for_minecraft_client" : skills.directory().toString(),
                     "skills", skills.list())));
         } catch (Exception exception) {
             return failure("Could not list MineGPT skills: " + exception.getMessage());

@@ -92,8 +92,9 @@ folders itself; MineGPT makes the folder available with `minegpt_list_skills()`
 and `minegpt_get_skill(name)`. The game client sends its run directory during
 the authenticated Bridge handshake, and the server instructions tell ChatGPT
 to list and load relevant skills at the start of a MineGPT task. For unusual
-launchers, set the client instance's normal game directory; no server setting
-is required.
+launchers, the client reports its normal game directory; no server setting is
+required. The Bridge does not create a fallback skill directory before a client
+connects.
 
 ## In-Game Use
 
