@@ -43,6 +43,8 @@ public final class LoopbackBridgeClient implements AutoCloseable {
     private final AtomicReference<String> gameDirectory = new AtomicReference<>();
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean connected = new AtomicBoolean();
+    private final AtomicBoolean closingForWorldExit = new AtomicBoolean();
+    private final AtomicBoolean restartAfterWorldExit = new AtomicBoolean();
     private volatile Socket socket;
     private Thread worker;
 
@@ -97,9 +99,27 @@ public final class LoopbackBridgeClient implements AutoCloseable {
 
     public void start() {
         if (!running.compareAndSet(false, true)) {
+            if (closingForWorldExit.get()) {
+                restartAfterWorldExit.set(true);
+            }
             return;
         }
+        closingForWorldExit.set(false);
         worker = Thread.ofVirtual().name("minegpt-bridge-client").start(this::runLoop);
+    }
+
+    /**
+     * Tells the Bridge that the player left the active world, then stops reconnecting. The
+     * signal is only sent across an already-established local connection; otherwise there is
+     * no Bridge process for this client to close.
+     */
+    public void closeForWorldExit() {
+        if (!running.get() || !closingForWorldExit.compareAndSet(false, true)) {
+            return;
+        }
+        if (!connected.get()) {
+            close();
+        }
     }
 
     private void runLoop() {
@@ -133,14 +153,26 @@ public final class LoopbackBridgeClient implements AutoCloseable {
                 socket = null;
                 setConnected(false);
             }
+            if (closingForWorldExit.get()) {
+                running.set(false);
+                break;
+            }
             sleep(retryDelayMillis);
             retryDelayMillis = Math.min(retryDelayMillis * 2, 30_000);
+        }
+        if (restartAfterWorldExit.compareAndSet(true, false)) {
+            start();
         }
     }
 
     private void sendUntilDisconnected(BufferedReader reader, BufferedWriter writer) throws IOException {
         ProtocolMessage awaitingAcknowledgement = null;
         while (running.get() && !Thread.currentThread().isInterrupted()) {
+            if (closingForWorldExit.get()) {
+                write(writer, ProtocolMessage.worldClosed());
+                running.set(false);
+                return;
+            }
             ProtocolMessage response;
             while ((response = responses.pollFirst()) != null) {
                 write(writer, response);
@@ -230,6 +262,7 @@ public final class LoopbackBridgeClient implements AutoCloseable {
 
     @Override
     public void close() {
+        restartAfterWorldExit.set(false);
         running.set(false);
         closeSocket();
         if (worker != null) {

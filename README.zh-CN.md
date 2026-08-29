@@ -47,6 +47,9 @@ Minecraft @gpt 消息 -> 本地 MineGPT Bridge -> ChatGPT 桌面版 -> 本地回
 
 监听期间请保持这个 ChatGPT 对话处于打开状态。Minecraft 无法自行打开或唤醒对话。
 
+离开 Minecraft 世界会自动结束对应的 MineGPT Bridge 会话。再次进入世界前，请在
+ChatGPT 桌面版中重新连接或重启 `minegpt` MCP 服务器。
+
 ## 游戏内使用
 
 - 在普通 Minecraft 聊天栏中输入 `@gpt <消息>`。例如：

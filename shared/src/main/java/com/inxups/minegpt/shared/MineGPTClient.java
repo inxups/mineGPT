@@ -71,6 +71,11 @@ public final class MineGPTClient implements AutoCloseable {
         bridge.start();
     }
 
+    /** Stops the Bridge session when Minecraft leaves a singleplayer or multiplayer world. */
+    public void onWorldClosed() {
+        bridge.closeForWorldExit();
+    }
+
     /**
      * @return false only when the caller should let Minecraft send the original chat to the server.
      */

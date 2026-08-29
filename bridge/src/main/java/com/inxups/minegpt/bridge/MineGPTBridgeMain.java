@@ -3,6 +3,7 @@ package com.inxups.minegpt.bridge;
 import io.modelcontextprotocol.server.McpSyncServer;
 import com.inxups.minegpt.shared.BridgeEndpoint;
 import java.nio.file.Path;
+import java.util.concurrent.CountDownLatch;
 
 /** Entry point used as a local STDIO MCP server by ChatGPT Desktop. */
 public final class MineGPTBridgeMain {
@@ -21,7 +22,8 @@ public final class MineGPTBridgeMain {
         pairingToken = stateStore.token();
         PendingMessageQueue queue = new PendingMessageQueue(stateStore);
         SkillStore skills = new SkillStore();
-        LoopbackBridgeServer bridge = new LoopbackBridgeServer(queue, pairingToken, skills);
+        CountDownLatch playerLeftWorld = new CountDownLatch(1);
+        LoopbackBridgeServer bridge = new LoopbackBridgeServer(queue, pairingToken, skills, playerLeftWorld::countDown);
         bridge.start(BridgeEndpoint.PORT);
         McpSyncServer mcpServer = new MineGPTMcpServer(bridge, skills).start();
 
@@ -30,7 +32,11 @@ public final class MineGPTBridgeMain {
             bridge.close();
         }, "minegpt-bridge-shutdown"));
 
-        // The MCP host owns this process. It terminates it when the configured server is stopped.
-        Thread.currentThread().join();
+        // The MCP host owns this process, but the Minecraft session can end first.
+        playerLeftWorld.await();
+        mcpServer.closeGracefully();
+        bridge.close();
+        // The SDK's STDIO reader remains blocked on the host pipe after a graceful close.
+        System.exit(0);
     }
 }

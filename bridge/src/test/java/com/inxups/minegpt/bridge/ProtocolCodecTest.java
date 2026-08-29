@@ -15,6 +15,12 @@ class ProtocolCodecTest {
     }
 
     @Test
+    void roundTripsWorldClosedSignal() {
+        ProtocolMessage expected = ProtocolMessage.worldClosed();
+        assertEquals(expected, ProtocolCodec.decode(ProtocolCodec.encode(expected)));
+    }
+
+    @Test
     void rejectsOversizedLines() {
         assertThrows(IllegalArgumentException.class, () -> ProtocolCodec.decode("x".repeat(ProtocolCodec.MAX_LINE_LENGTH + 1)));
     }

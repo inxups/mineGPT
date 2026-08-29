@@ -27,6 +27,11 @@ public record ProtocolMessage(
         return new ProtocolMessage("hello_accepted", null, null, null, null, null, null, null, null, null, null, null);
     }
 
+    /** Sent by the Mod before its player leaves the current world. */
+    public static ProtocolMessage worldClosed() {
+        return new ProtocolMessage("world_closed", null, null, null, null, null, null, null, null, null, null, null);
+    }
+
     public static ProtocolMessage playerMessage(PlayerMessage message) {
         return new ProtocolMessage("player_message", null, null, message.id(), message, null, null, null, null, null, null, null);
     }

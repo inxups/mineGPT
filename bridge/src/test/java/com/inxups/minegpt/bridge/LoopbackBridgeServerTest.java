@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -139,6 +140,25 @@ class LoopbackBridgeServerTest {
                 assertTrue(skills.directory().startsWith(instanceDirectory));
                 assertTrue(java.nio.file.Files.isRegularFile(
                         instanceDirectory.resolve("minegpt/skills/minegpt-guide.md")));
+            }
+        }
+    }
+
+    @Test
+    void signalsWhenTheMinecraftClientLeavesItsWorld() throws Exception {
+        BridgeStateStore state = new BridgeStateStore(temporaryDirectory.resolve("bridge-state.json"));
+        PendingMessageQueue queue = new PendingMessageQueue(state);
+        CountDownLatch playerLeftWorld = new CountDownLatch(1);
+        try (LoopbackBridgeServer server = new LoopbackBridgeServer(
+                queue, state.token(), new SkillStore(), playerLeftWorld::countDown)) {
+            server.start(0);
+            try (Socket client = new Socket(BridgeEndpoint.address(), server.port());
+                 BufferedReader reader = reader(client);
+                 BufferedWriter writer = writer(client)) {
+                send(writer, ProtocolMessage.hello(state.token()));
+                assertEquals("hello_accepted", receive(reader).type());
+                send(writer, ProtocolMessage.worldClosed());
+                assertTrue(playerLeftWorld.await(2, TimeUnit.SECONDS));
             }
         }
     }

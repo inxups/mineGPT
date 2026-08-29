@@ -54,6 +54,10 @@ Minecraft @gpt message -> local MineGPT Bridge -> ChatGPT Desktop -> local reply
 Keep this ChatGPT conversation open while it is listening. Minecraft cannot
 open or wake a conversation on its own.
 
+Leaving a Minecraft world automatically ends its MineGPT Bridge session. Before
+entering another world, reconnect or restart the `minegpt` MCP server in
+ChatGPT Desktop.
+
 ## Use It In Game
 
 - Type `@gpt <message>` in the normal Minecraft chat box. For example:
