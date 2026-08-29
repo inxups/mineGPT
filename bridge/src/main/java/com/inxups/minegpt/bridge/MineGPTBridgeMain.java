@@ -5,10 +5,10 @@ import com.inxups.minegpt.shared.BridgeEndpoint;
 import java.nio.file.Path;
 
 /** Entry point used as a local STDIO MCP server by ChatGPT Desktop. */
-public final class MineGptBridgeMain {
+public final class MineGPTBridgeMain {
     private static volatile String pairingToken;
 
-    private MineGptBridgeMain() {
+    private MineGPTBridgeMain() {
     }
 
     static String token() {
@@ -23,7 +23,7 @@ public final class MineGptBridgeMain {
         SkillStore skills = new SkillStore();
         LoopbackBridgeServer bridge = new LoopbackBridgeServer(queue, pairingToken, skills);
         bridge.start(BridgeEndpoint.PORT);
-        McpSyncServer mcpServer = new MineGptMcpServer(bridge, skills).start();
+        McpSyncServer mcpServer = new MineGPTMcpServer(bridge, skills).start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             mcpServer.closeGracefully();

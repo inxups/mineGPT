@@ -5,13 +5,13 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 /** Shared client behaviour; Fabric and NeoForge only supply platform adapters. */
-public final class MineGptClient implements AutoCloseable {
+public final class MineGPTClient implements AutoCloseable {
     private static final String PREFIX = "@ai";
     private final ClientPlatform platform;
     private final PairingConfig pairingConfig;
     private final LoopbackBridgeClient bridge;
 
-    public MineGptClient(Path configPath, ClientPlatform platform) {
+    public MineGPTClient(Path configPath, ClientPlatform platform) {
         this.platform = platform;
         pairingConfig = new PairingConfig(configPath);
         try {

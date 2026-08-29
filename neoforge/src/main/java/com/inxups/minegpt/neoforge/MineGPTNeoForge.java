@@ -5,7 +5,7 @@ import com.inxups.minegpt.shared.ChunkInfo;
 import com.inxups.minegpt.shared.ChunkQuery;
 import com.inxups.minegpt.shared.GameQuery;
 import com.inxups.minegpt.shared.GameQueryResult;
-import com.inxups.minegpt.shared.MineGptClient;
+import com.inxups.minegpt.shared.MineGPTClient;
 import com.inxups.minegpt.shared.PlayerContext;
 import com.mojang.logging.LogUtils;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -41,22 +41,22 @@ import java.util.List;
 import java.util.Map;
 
 /** Client entry point for the NeoForge build. */
-@Mod(value = MineGptNeoForge.MOD_ID, dist = Dist.CLIENT)
-public final class MineGptNeoForge {
+@Mod(value = MineGPTNeoForge.MOD_ID, dist = Dist.CLIENT)
+public final class MineGPTNeoForge {
     public static final String MOD_ID = "minegpt";
     private static final Logger LOGGER = LogUtils.getLogger();
-    private final MineGptClient mineGpt;
+    private final MineGPTClient mineGPT;
 
-    public MineGptNeoForge() {
-        mineGpt = new MineGptClient(FMLPaths.CONFIGDIR.get().resolve("minegpt.json"), new NeoForgePlatform());
+    public MineGPTNeoForge() {
+        mineGPT = new MineGPTClient(FMLPaths.CONFIGDIR.get().resolve("minegpt.json"), new NeoForgePlatform());
         NeoForge.EVENT_BUS.addListener(this::onClientChat);
         NeoForge.EVENT_BUS.addListener(this::registerClientCommands);
-        mineGpt.start();
+        mineGPT.start();
         LOGGER.info("MineGPT NeoForge client initialized");
     }
 
     private void onClientChat(ClientChatEvent event) {
-        if (mineGpt.handleChat(event.getMessage())) {
+        if (mineGPT.handleChat(event.getMessage())) {
             event.setCanceled(true);
         }
     }
@@ -66,12 +66,12 @@ public final class MineGptNeoForge {
                 .then(Commands.literal("pair")
                         .then(Commands.argument("token", StringArgumentType.greedyString())
                                 .executes(context -> {
-                                    mineGpt.pair(StringArgumentType.getString(context, "token"));
+                                    mineGPT.pair(StringArgumentType.getString(context, "token"));
                                     return 1;
                                 })))
                 .then(Commands.literal("status")
                         .executes(context -> {
-                            mineGpt.showStatus();
+                            mineGPT.showStatus();
                             return 1;
                         })));
     }

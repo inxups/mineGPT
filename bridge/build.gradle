@@ -20,7 +20,7 @@ sourceSets {
 }
 
 application {
-    mainClass = 'com.inxups.minegpt.bridge.MineGptBridgeMain'
+    mainClass = 'com.inxups.minegpt.bridge.MineGPTBridgeMain'
 }
 
 dependencies {

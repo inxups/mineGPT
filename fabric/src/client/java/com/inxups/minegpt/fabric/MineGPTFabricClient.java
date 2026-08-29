@@ -5,7 +5,7 @@ import com.inxups.minegpt.shared.ChunkInfo;
 import com.inxups.minegpt.shared.ChunkQuery;
 import com.inxups.minegpt.shared.GameQuery;
 import com.inxups.minegpt.shared.GameQueryResult;
-import com.inxups.minegpt.shared.MineGptClient;
+import com.inxups.minegpt.shared.MineGPTClient;
 import com.inxups.minegpt.shared.PlayerContext;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ClientModInitializer;
@@ -39,31 +39,31 @@ import java.util.List;
 import java.util.Map;
 
 /** Client entry point for the Fabric build. */
-public final class MineGptFabricClient implements ClientModInitializer {
+public final class MineGPTFabricClient implements ClientModInitializer {
     public static final String MOD_ID = "minegpt";
     private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    private MineGptClient mineGpt;
+    private MineGPTClient mineGPT;
 
     @Override
     public void onInitializeClient() {
-        mineGpt = new MineGptClient(
+        mineGPT = new MineGPTClient(
                 FabricLoader.getInstance().getConfigDir().resolve("minegpt.json"),
                 new FabricPlatform());
-        ClientSendMessageEvents.ALLOW_CHAT.register(message -> !mineGpt.handleChat(message));
+        ClientSendMessageEvents.ALLOW_CHAT.register(message -> !mineGPT.handleChat(message));
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
                 ClientCommandManager.literal("minegpt")
                         .then(ClientCommandManager.literal("pair")
                                 .then(ClientCommandManager.argument("token", StringArgumentType.greedyString())
                                         .executes(context -> {
-                                            mineGpt.pair(StringArgumentType.getString(context, "token"));
+                                            mineGPT.pair(StringArgumentType.getString(context, "token"));
                                             return 1;
                                         })))
                         .then(ClientCommandManager.literal("status")
                                 .executes(context -> {
-                                    mineGpt.showStatus();
+                                    mineGPT.showStatus();
                                     return 1;
                                 }))));
-        mineGpt.start();
+        mineGPT.start();
         LOGGER.info("MineGPT Fabric client initialized");
     }
 

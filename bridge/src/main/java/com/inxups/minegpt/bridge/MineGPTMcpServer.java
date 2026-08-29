@@ -17,15 +17,15 @@ import java.util.Map;
 import java.util.Optional;
 
 /** Registers the MCP tools used by the ChatGPT Desktop listening conversation. */
-final class MineGptMcpServer {
+final class MineGPTMcpServer {
     private final LoopbackBridgeServer bridge;
     private final SkillStore skills;
 
-    MineGptMcpServer(LoopbackBridgeServer bridge) {
+    MineGPTMcpServer(LoopbackBridgeServer bridge) {
         this(bridge, new SkillStore());
     }
 
-    MineGptMcpServer(LoopbackBridgeServer bridge, SkillStore skills) {
+    MineGPTMcpServer(LoopbackBridgeServer bridge, SkillStore skills) {
         this.bridge = bridge;
         this.skills = skills;
     }
@@ -71,7 +71,7 @@ final class MineGptMcpServer {
 
     private String bridgeToken() {
         // Only the MCP host can invoke this local STDIO tool; the socket itself never exposes its token.
-        return MineGptBridgeMain.token();
+        return MineGPTBridgeMain.token();
     }
 
     private String instructions() {
@@ -109,7 +109,7 @@ final class MineGptMcpServer {
         }
         try {
             Optional<PlayerMessage> message = bridge.nextMessage(Duration.ofSeconds(waitSeconds));
-            return success(message.<String>map(MineGptMcpServer::toMcpPlayerMessage).orElse("{\"status\":\"idle\"}"));
+            return success(message.<String>map(MineGPTMcpServer::toMcpPlayerMessage).orElse("{\"status\":\"idle\"}"));
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return failure("MineGPT listener was interrupted.");
