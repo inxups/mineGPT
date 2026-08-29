@@ -14,6 +14,11 @@ public final class MineGptClient implements AutoCloseable {
     public MineGptClient(Path configPath, ClientPlatform platform) {
         this.platform = platform;
         pairingConfig = new PairingConfig(configPath);
+        try {
+            SkillFileInstaller.ensureDefaultSkill(platform.gameDirectory());
+        } catch (IOException ignored) {
+            // The game directory can be unavailable during unusual launcher startup; the Bridge retries after handshake.
+        }
         bridge = new LoopbackBridgeClient(new LoopbackBridgeClient.Listener() {
             @Override
             public void onReply(String messageId, String text) {
