@@ -1,5 +1,6 @@
 package com.inxups.minegpt.bridge;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -17,7 +18,8 @@ import java.util.stream.Stream;
 /** User-editable Markdown skills stored alongside the active Minecraft instance. */
 final class SkillStore implements AutoCloseable {
     static final String DEFAULT_SKILL_FILE = "minegpt-guide.md";
-    private static final long MAX_SKILL_BYTES = 32 * 1024;
+    private static final long MAX_SKILL_BYTES = 256 * 1024;
+    private static final int MAX_SKILL_NESTING_DEPTH = 8;
 
     private volatile Path skillsDirectory;
     private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -87,11 +89,12 @@ final class SkillStore implements AutoCloseable {
             return List.of();
         }
         initialize();
-        try (Stream<Path> entries = Files.list(skillsDirectory)) {
+        try (Stream<Path> entries = Files.walk(skillsDirectory, MAX_SKILL_NESTING_DEPTH + 1)) {
             return entries
                     .filter(Files::isRegularFile)
+                    .filter(path -> !Files.isSymbolicLink(path))
                     .filter(SkillStore::isMarkdown)
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
+                    .sorted(Comparator.comparing(this::relativeName, String.CASE_INSENSITIVE_ORDER))
                     .map(this::summary)
                     .toList();
         }
@@ -109,25 +112,38 @@ final class SkillStore implements AutoCloseable {
 
     private SkillSummary summary(Path skill) {
         try {
-            return new SkillSummary(skill.getFileName().toString(), description(Files.readString(skill, StandardCharsets.UTF_8)));
+            if (Files.size(skill) > MAX_SKILL_BYTES) {
+                return new SkillSummary(relativeName(skill), "Skill file exceeds " + MAX_SKILL_BYTES + " bytes.");
+            }
+            return new SkillSummary(relativeName(skill), description(Files.readString(skill, StandardCharsets.UTF_8)));
         } catch (IOException exception) {
-            return new SkillSummary(skill.getFileName().toString(), "Could not read this skill file.");
+            return new SkillSummary(relativeName(skill), "Could not read this skill file.");
         }
     }
 
     private Path resolveSkill(String name) throws IOException {
-        if (name == null || name.isBlank() || name.length() > 128 || !isMarkdown(Path.of(name))) {
-            throw new IOException("name must be a Markdown filename in the MineGPT skills directory.");
+        if (name == null || name.isBlank() || name.length() > 512 || name.indexOf('\\') >= 0) {
+            throw new IOException("name must be a relative Markdown path in the MineGPT skills directory.");
         }
-        Path fileName = Path.of(name).getFileName();
-        if (fileName == null || !fileName.toString().equals(name)) {
-            throw new IOException("Skill names cannot contain a path.");
+        Path relativePath;
+        try {
+            relativePath = Path.of(name);
+        } catch (RuntimeException exception) {
+            throw new IOException("name must be a relative Markdown path in the MineGPT skills directory.", exception);
         }
-        Path skill = skillsDirectory.resolve(fileName).normalize();
-        if (!skill.getParent().equals(skillsDirectory) || !Files.isRegularFile(skill)) {
+        if (relativePath.isAbsolute() || relativePath.getNameCount() > MAX_SKILL_NESTING_DEPTH + 1
+                || !isMarkdown(relativePath)) {
+            throw new IOException("name must be a relative Markdown path in the MineGPT skills directory.");
+        }
+        Path skill = skillsDirectory.resolve(relativePath).normalize();
+        if (!skill.startsWith(skillsDirectory) || !Files.isRegularFile(skill) || Files.isSymbolicLink(skill)) {
             throw new IOException("Skill not found: " + name);
         }
         return skill;
+    }
+
+    private String relativeName(Path skill) {
+        return skillsDirectory.relativize(skill).toString().replace(File.separatorChar, '/');
     }
 
     private static boolean isMarkdown(Path path) {

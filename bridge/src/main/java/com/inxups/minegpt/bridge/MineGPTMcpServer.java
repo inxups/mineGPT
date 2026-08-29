@@ -42,9 +42,9 @@ final class MineGPTMcpServer {
                                 "host", "127.0.0.1",
                                 "port", bridge.port(),
                                 "token", bridgeToken()))))
-                .toolCall(tool("minegpt_list_skills", "List user-editable MineGPT Markdown skills from the local Minecraft minegpt/skills directory.", Map.of()),
+                .toolCall(tool("minegpt_list_skills", "List user-editable MineGPT Markdown skills, up to eight nested directories deep, from the local Minecraft minegpt/skills directory.", Map.of()),
                         (exchange, request) -> listSkills())
-                .toolCall(tool("minegpt_get_skill", "Read one Markdown skill from the local Minecraft minegpt/skills directory. Call minegpt_list_skills first to discover valid names.", skillSchema()),
+                .toolCall(tool("minegpt_get_skill", "Read one Markdown skill from the local Minecraft minegpt/skills directory. Call minegpt_list_skills first and pass its relative path.", skillSchema()),
                         (exchange, request) -> getSkill(request.arguments()))
                 .toolCall(tool("minegpt_get_chunk_info", "Read a 16 by 16 surface summary of one chunk already loaded by the Minecraft client. Omit both coordinates for the player's current chunk. This never loads a chunk.", chunkSchema()),
                         (exchange, request) -> chunkInfo(request.arguments()))
@@ -260,7 +260,7 @@ final class MineGPTMcpServer {
     private static Map<String, Object> skillSchema() {
         return Map.of("name", Map.of(
                 "type", "string",
-                "description", "Exact Markdown filename returned by minegpt_list_skills; omit to load minegpt-guide.md."));
+                "description", "Exact relative Markdown path returned by minegpt_list_skills; omit to load minegpt-guide.md."));
     }
 
     private static Map<String, Object> radiusSchema() {

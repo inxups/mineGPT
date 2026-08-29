@@ -86,7 +86,9 @@ launcher, the reported game run directory is usually its `.minecraft` folder,
 so the path is `.minecraft/minegpt/skills/`. This
 means each Prism, Modrinth, or development instance can have different skills.
 
-Put Markdown skill files in this directory. ChatGPT Desktop does not scan local
+Put Markdown skill files in this directory. Subdirectories are supported up to
+eight levels deep, so a skill can be named `building/redstone/guide.md`.
+Individual files may be up to 256 KiB. ChatGPT Desktop does not scan local
 folders itself; MineGPT makes the folder available with `minegpt_list_skills()`
 and `minegpt_get_skill(name)`. The game client sends its run directory during
 the authenticated Bridge handshake, and the server instructions tell ChatGPT
@@ -115,9 +117,9 @@ token in its normal `config/minegpt.json` file.
 - `minegpt_status()` returns the Bridge connection and queue state.
 - `minegpt_pairing_code()` returns the local host, port, and pairing token.
 - `minegpt_list_skills()` lists Markdown skills in the local Minecraft
-  `minegpt/skills` directory.
-- `minegpt_get_skill(name?)` reads one listed Markdown skill; omitting `name`
-  loads the default `minegpt-guide.md`.
+  `minegpt/skills` directory, including nested files up to eight levels deep.
+- `minegpt_get_skill(name?)` reads one listed Markdown skill by its relative
+  path; omitting `name` loads the default `minegpt-guide.md`.
 - `minegpt_get_chunk_info(chunk_x?, chunk_z?)` returns a read-only snapshot of a
   single chunk already loaded by the client. Omitting both coordinates reads the
   player's current chunk; otherwise provide both chunk coordinates. It returns

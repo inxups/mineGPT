@@ -31,6 +31,28 @@ class MineGPTSkillTest {
     }
 
     @Test
+    void listsAndReadsNestedSkillsUsingRelativePaths() throws Exception {
+        SkillStore skills = new SkillStore(temporaryDirectory);
+        skills.initialize();
+        Path nestedSkill = temporaryDirectory.resolve("minegpt/skills/building/redstone/guide.md");
+        Files.createDirectories(nestedSkill.getParent());
+        Files.writeString(nestedSkill, "---\ndescription: Redstone building advice\n---\n# Redstone\n");
+
+        assertTrue(skills.list().stream().anyMatch(skill -> skill.name().equals("building/redstone/guide.md")));
+        assertTrue(skills.read("building/redstone/guide.md").contains("# Redstone"));
+    }
+
+    @Test
+    void readsSkillsUpToTheExpandedSizeLimit() throws Exception {
+        SkillStore skills = new SkillStore(temporaryDirectory);
+        skills.initialize();
+        Path largeSkill = temporaryDirectory.resolve("minegpt/skills/reference.md");
+        Files.writeString(largeSkill, "x".repeat(256 * 1024));
+
+        assertEquals(256 * 1024, skills.read("reference.md").length());
+    }
+
+    @Test
     void rejectsSkillPathsOutsideTheSkillsDirectory() throws Exception {
         SkillStore skills = new SkillStore(temporaryDirectory);
         skills.initialize();
