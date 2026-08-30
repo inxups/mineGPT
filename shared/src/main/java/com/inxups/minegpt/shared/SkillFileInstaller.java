@@ -9,11 +9,17 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
 
 /** Installs the default user-editable skill from the client Mod at game startup. */
 public final class SkillFileInstaller {
     public static final String DEFAULT_SKILL_FILE = "minegpt-guide.md";
-    private static final String TEMPLATE_RESOURCE = "/MINEGPT_CLIENT_SKILL.md";
+    public static final String LIVE_DATA_SKILL_FILE = "live-data/SKILL.md";
+    public static final String MODPACK_RECIPE_SKILL_FILE = "modpack-recipe-investigation/SKILL.md";
+    private static final List<BuiltinSkill> BUILTIN_SKILLS = List.of(
+            new BuiltinSkill(DEFAULT_SKILL_FILE, "/MINEGPT_CLIENT_SKILL.md"),
+            new BuiltinSkill(LIVE_DATA_SKILL_FILE, "/MINEGPT_LIVE_DATA_SKILL.md"),
+            new BuiltinSkill(MODPACK_RECIPE_SKILL_FILE, "/MINEGPT_MODPACK_RECIPE_SKILL.md"));
 
     private SkillFileInstaller() {
     }
@@ -26,20 +32,34 @@ public final class SkillFileInstaller {
     }
 
     public static Path ensureDefaultSkill(Path gameDirectory) throws IOException {
+        ensureBuiltinSkills(gameDirectory);
+        return skillsDirectory(gameDirectory).resolve(DEFAULT_SKILL_FILE);
+    }
+
+    /** Ensures the built-in MineGPT workflows exist without replacing user edits. */
+    public static List<Path> ensureBuiltinSkills(Path gameDirectory) throws IOException {
         Path directory = skillsDirectory(gameDirectory);
         Files.createDirectories(directory);
-        Path target = directory.resolve(DEFAULT_SKILL_FILE);
-        if (Files.exists(target)) {
-            return target;
+        java.util.ArrayList<Path> installed = new java.util.ArrayList<>(BUILTIN_SKILLS.size());
+        for (BuiltinSkill skill : BUILTIN_SKILLS) {
+            Path target = directory.resolve(skill.relativePath());
+            Files.createDirectories(target.getParent());
+            if (!Files.exists(target)) {
+                writeTemplate(target, skill.templateResource());
+            }
+            installed.add(target);
         }
-        try (InputStream input = SkillFileInstaller.class.getResourceAsStream(TEMPLATE_RESOURCE)) {
+        return List.copyOf(installed);
+    }
+
+    private static void writeTemplate(Path target, String templateResource) throws IOException {
+        try (InputStream input = SkillFileInstaller.class.getResourceAsStream(templateResource)) {
             if (input == null) {
-                throw new IOException("MineGPT client skill template is missing from the Mod.");
+                throw new IOException("MineGPT client skill template is missing from the Mod: " + templateResource);
             }
             Files.writeString(target, new String(input.readAllBytes(), StandardCharsets.UTF_8),
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);
         }
-        return target;
     }
 
     /** Downloads and installs one public GitHub Markdown skill without replacing existing files. */
@@ -135,5 +155,8 @@ public final class SkillFileInstaller {
     }
 
     public record ImportedSkill(String repository, String ref, String sourceUrl, String installedPath) {
+    }
+
+    private record BuiltinSkill(String relativePath, String templateResource) {
     }
 }

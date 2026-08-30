@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -63,5 +65,65 @@ class GameDirectoryStoreTest {
         assertFalse(files.options().available());
         assertFalse(files.recentLog(200).available());
         skills.close();
+    }
+
+    @Test
+    void searchesRelevantLocalModpackDataWithoutLeavingTheInstance() throws Exception {
+        Path gameDirectory = temporaryDirectory.resolve("instance");
+        SkillStore skills = new SkillStore(gameDirectory);
+        GameDirectoryStore files = new GameDirectoryStore(skills);
+        write(gameDirectory.resolve("kubejs/server_scripts/recipes.js"),
+                "event.recipes.createMixing('example:sky_ingot', ['example:dust'])\n");
+        write(gameDirectory.resolve("config/custom-recipes.json"),
+                "{\"output\":\"example:sky_ingot\"}\n");
+        write(gameDirectory.resolve("config/ftbquests/quests/chapter.snbt"),
+                "{rewards:[{item:\"example:sky_ingot\"}]}\n");
+        write(gameDirectory.resolve("saves/local/datapacks/pack/data/example/recipe/sky_ingot.json"),
+                "{\"result\":{\"id\":\"example:sky_ingot\"}}\n");
+
+        GameDirectoryStore.ModpackSearchResult all = files.searchModpackFiles("EXAMPLE:SKY_INGOT", "all");
+        assertTrue(all.matches().stream().anyMatch(match -> match.path().equals("kubejs/server_scripts/recipes.js")));
+        assertTrue(all.matches().stream().anyMatch(match -> match.path().equals("config/ftbquests/quests/chapter.snbt")));
+        assertTrue(all.matches().stream().anyMatch(match -> match.path().equals("saves/local/datapacks/pack/data/example/recipe/sky_ingot.json")));
+
+        GameDirectoryStore.ModpackSearchResult kubeJs = files.searchModpackFiles("example:sky_ingot", "kubejs");
+        assertEquals(1, kubeJs.matches().size());
+        assertEquals("kubejs/server_scripts/recipes.js", kubeJs.matches().getFirst().path());
+        assertThrows(java.io.IOException.class, () -> files.searchModpackFiles("example:sky_ingot", "outside"));
+        skills.close();
+    }
+
+    @Test
+    void inspectsOnlyDirectModJarsWithBoundedResourceAndClassStringMatches() throws Exception {
+        Path gameDirectory = temporaryDirectory.resolve("instance");
+        SkillStore skills = new SkillStore(gameDirectory);
+        GameDirectoryStore files = new GameDirectoryStore(skills);
+        Path jar = gameDirectory.resolve("mods/example-mod.jar");
+        Files.createDirectories(jar.getParent());
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            addJarEntry(output, "fabric.mod.json", "{\"id\":\"examplemod\",\"name\":\"Example Mod\"}");
+            addJarEntry(output, "data/example/recipe/sky_ingot.json", "{\"result\":\"example:sky_ingot\"}");
+            addJarEntry(output, "com/example/Recipe.class", "not-bytecode\u0000example:sky_ingot\u0000serializer");
+        }
+
+        GameDirectoryStore.ModJarInspection inspection = files.inspectModJar("example-mod.jar", "example:sky_ingot");
+        assertTrue(inspection.available());
+        assertTrue(inspection.metadata().stream().anyMatch(match -> match.path().equals("fabric.mod.json")));
+        assertTrue(inspection.matches().stream().anyMatch(match -> match.path().equals("data/example/recipe/sky_ingot.json")));
+        assertTrue(inspection.matches().stream().anyMatch(match -> match.path().equals("com/example/Recipe.class")
+                && match.kind().equals("class-string")));
+        assertThrows(java.io.IOException.class, () -> files.inspectModJar("../example-mod.jar", null));
+        skills.close();
+    }
+
+    private static void write(Path path, String content) throws Exception {
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, content);
+    }
+
+    private static void addJarEntry(JarOutputStream output, String name, String content) throws Exception {
+        output.putNextEntry(new JarEntry(name));
+        output.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        output.closeEntry();
     }
 }

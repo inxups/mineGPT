@@ -21,8 +21,14 @@ import java.util.stream.Stream;
 /** User-editable Markdown skills stored alongside the active Minecraft instance. */
 final class SkillStore implements AutoCloseable {
     static final String DEFAULT_SKILL_FILE = "minegpt-guide.md";
+    static final String LIVE_DATA_SKILL_FILE = "live-data/SKILL.md";
+    static final String MODPACK_RECIPE_SKILL_FILE = "modpack-recipe-investigation/SKILL.md";
     static final long MAX_SKILL_BYTES = 256 * 1024;
     private static final int MAX_SKILL_NESTING_DEPTH = 8;
+    private static final List<BuiltinSkill> BUILTIN_SKILLS = List.of(
+            new BuiltinSkill(DEFAULT_SKILL_FILE, "/MINEGPT_CLIENT_SKILL.md"),
+            new BuiltinSkill(LIVE_DATA_SKILL_FILE, "/MINEGPT_LIVE_DATA_SKILL.md"),
+            new BuiltinSkill(MODPACK_RECIPE_SKILL_FILE, "/MINEGPT_MODPACK_RECIPE_SKILL.md"));
 
     private volatile Path skillsDirectory;
     private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -67,15 +73,21 @@ final class SkillStore implements AutoCloseable {
             throw new IOException("Minecraft client has not reported its game directory yet.");
         }
         Files.createDirectories(skillsDirectory);
-        Path defaultSkill = skillsDirectory.resolve(DEFAULT_SKILL_FILE);
-        if (Files.exists(defaultSkill)) {
-            return;
-        }
-        try (InputStream input = SkillStore.class.getResourceAsStream("/MINEGPT_SKILL.md")) {
-            if (input == null) {
-                throw new IOException("Bundled MineGPT skill template is missing.");
+        for (BuiltinSkill skill : BUILTIN_SKILLS) {
+            Path target = skillsDirectory.resolve(skill.relativePath());
+            Files.createDirectories(target.getParent());
+            if (!Files.exists(target)) {
+                writeTemplate(target, skill.templateResource());
             }
-            Files.writeString(defaultSkill, new String(input.readAllBytes(), StandardCharsets.UTF_8),
+        }
+    }
+
+    private static void writeTemplate(Path target, String templateResource) throws IOException {
+        try (InputStream input = SkillStore.class.getResourceAsStream(templateResource)) {
+            if (input == null) {
+                throw new IOException("Bundled MineGPT skill template is missing: " + templateResource);
+            }
+            Files.writeString(target, new String(input.readAllBytes(), StandardCharsets.UTF_8),
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);
         }
     }
@@ -263,6 +275,9 @@ final class SkillStore implements AutoCloseable {
     }
 
     record SkillSummary(String name, String description) {
+    }
+
+    private record BuiltinSkill(String relativePath, String templateResource) {
     }
 
     @Override

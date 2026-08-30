@@ -29,7 +29,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.event.ClientChatEvent;
-import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
@@ -51,9 +50,8 @@ public final class MineGPTNeoForge {
     public MineGPTNeoForge() {
         mineGPT = new MineGPTClient(FMLPaths.CONFIGDIR.get().resolve("minegpt.json"), new NeoForgePlatform());
         NeoForge.EVENT_BUS.addListener(this::onClientChat);
-        NeoForge.EVENT_BUS.addListener(this::onPlayerLogin);
-        NeoForge.EVENT_BUS.addListener(this::onPlayerLogout);
         NeoForge.EVENT_BUS.addListener(this::registerClientCommands);
+        mineGPT.start();
         LOGGER.info("MineGPT NeoForge client initialized");
     }
 
@@ -61,14 +59,6 @@ public final class MineGPTNeoForge {
         if (mineGPT.handleChat(event.getMessage())) {
             event.setCanceled(true);
         }
-    }
-
-    private void onPlayerLogin(ClientPlayerNetworkEvent.LoggingIn event) {
-        mineGPT.start();
-    }
-
-    private void onPlayerLogout(ClientPlayerNetworkEvent.LoggingOut event) {
-        mineGPT.onWorldClosed();
     }
 
     private void registerClientCommands(RegisterClientCommandsEvent event) {

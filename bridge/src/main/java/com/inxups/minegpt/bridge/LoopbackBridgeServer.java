@@ -34,7 +34,7 @@ final class LoopbackBridgeServer implements AutoCloseable {
     private final PendingMessageQueue queue;
     private final String token;
     private final SkillStore skills;
-    private final Runnable onWorldClosed;
+    private final Runnable onClientClosed;
     private final ExecutorService clients = Executors.newVirtualThreadPerTaskExecutor();
     private final AtomicReference<ClientConnection> activeConnection = new AtomicReference<>();
     private final ConcurrentHashMap<String, CompletableFuture<ChunkInfo>> pendingChunkRequests = new ConcurrentHashMap<>();
@@ -51,11 +51,11 @@ final class LoopbackBridgeServer implements AutoCloseable {
         this(queue, token, skills, () -> { });
     }
 
-    LoopbackBridgeServer(PendingMessageQueue queue, String token, SkillStore skills, Runnable onWorldClosed) {
+    LoopbackBridgeServer(PendingMessageQueue queue, String token, SkillStore skills, Runnable onClientClosed) {
         this.queue = queue;
         this.token = token;
         this.skills = skills;
-        this.onWorldClosed = onWorldClosed;
+        this.onClientClosed = onClientClosed;
     }
 
     synchronized void start(int requestedPort) throws IOException {
@@ -207,8 +207,8 @@ final class LoopbackBridgeServer implements AutoCloseable {
                     completeGameQuery(message);
                     continue;
                 }
-                if ("world_closed".equals(message.type())) {
-                    onWorldClosed.run();
+                if ("client_closed".equals(message.type())) {
+                    onClientClosed.run();
                     return;
                 }
                 if (!"player_message".equals(message.type()) || message.message() == null

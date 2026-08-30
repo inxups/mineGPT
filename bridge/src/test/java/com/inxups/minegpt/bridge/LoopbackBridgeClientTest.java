@@ -1,6 +1,7 @@
 package com.inxups.minegpt.bridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.inxups.minegpt.shared.LoopbackBridgeClient;
 import com.inxups.minegpt.shared.ChunkQuery;
@@ -86,6 +87,57 @@ class LoopbackBridgeClientTest {
                 }
             }
         }
+    }
+
+    @Test
+    void notifiesTheBridgeOnlyWhenTheMinecraftClientExits() throws Exception {
+        BridgeStateStore state = new BridgeStateStore(temporaryDirectory.resolve("bridge-state.json"));
+        PendingMessageQueue queue = new PendingMessageQueue(state);
+        CountDownLatch connected = new CountDownLatch(1);
+        CountDownLatch minecraftExited = new CountDownLatch(1);
+        try (LoopbackBridgeServer server = new LoopbackBridgeServer(
+                queue, state.token(), new SkillStore(), minecraftExited::countDown)) {
+            server.start(0);
+            try (LoopbackBridgeClient client = new LoopbackBridgeClient(server.port(), listener(connected))) {
+                client.setToken(state.token());
+                client.start();
+                assertTrue(connected.await(2, TimeUnit.SECONDS));
+
+                client.closeForClientExit();
+                assertTrue(minecraftExited.await(2, TimeUnit.SECONDS));
+            }
+        }
+    }
+
+    private static LoopbackBridgeClient.Listener listener(CountDownLatch connected) {
+        return new LoopbackBridgeClient.Listener() {
+            @Override
+            public void onReply(String messageId, String text) {
+                // Not used by this lifecycle test.
+            }
+
+            @Override
+            public void onChunkInfoRequest(String requestId, ChunkQuery query) {
+                throw new AssertionError("Unexpected chunk query in this test");
+            }
+
+            @Override
+            public void onGameQueryRequest(String requestId, GameQuery query) {
+                throw new AssertionError("Unexpected game query in this test");
+            }
+
+            @Override
+            public void onBridgeError(String detail) {
+                throw new AssertionError(detail);
+            }
+
+            @Override
+            public void onConnectionChanged(boolean isConnected) {
+                if (isConnected) {
+                    connected.countDown();
+                }
+            }
+        };
     }
 
     private static PlayerMessage message(String suffix) {

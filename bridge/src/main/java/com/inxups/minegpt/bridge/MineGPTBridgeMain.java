@@ -22,8 +22,8 @@ public final class MineGPTBridgeMain {
         pairingToken = stateStore.token();
         PendingMessageQueue queue = new PendingMessageQueue(stateStore);
         SkillStore skills = new SkillStore();
-        CountDownLatch playerLeftWorld = new CountDownLatch(1);
-        LoopbackBridgeServer bridge = new LoopbackBridgeServer(queue, pairingToken, skills, playerLeftWorld::countDown);
+        CountDownLatch minecraftExited = new CountDownLatch(1);
+        LoopbackBridgeServer bridge = new LoopbackBridgeServer(queue, pairingToken, skills, minecraftExited::countDown);
         bridge.start(BridgeEndpoint.PORT);
         McpSyncServer mcpServer = new MineGPTMcpServer(bridge, skills).start();
 
@@ -32,8 +32,8 @@ public final class MineGPTBridgeMain {
             bridge.close();
         }, "minegpt-bridge-shutdown"));
 
-        // The MCP host owns this process, but the Minecraft session can end first.
-        playerLeftWorld.await();
+        // The MCP host owns this process, but the Minecraft process can end first.
+        minecraftExited.await();
         mcpServer.closeGracefully();
         bridge.close();
         // The SDK's STDIO reader remains blocked on the host pipe after a graceful close.

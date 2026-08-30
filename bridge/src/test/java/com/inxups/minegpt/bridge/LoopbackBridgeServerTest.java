@@ -145,20 +145,20 @@ class LoopbackBridgeServerTest {
     }
 
     @Test
-    void signalsWhenTheMinecraftClientLeavesItsWorld() throws Exception {
+    void signalsWhenTheMinecraftClientExits() throws Exception {
         BridgeStateStore state = new BridgeStateStore(temporaryDirectory.resolve("bridge-state.json"));
         PendingMessageQueue queue = new PendingMessageQueue(state);
-        CountDownLatch playerLeftWorld = new CountDownLatch(1);
+        CountDownLatch minecraftExited = new CountDownLatch(1);
         try (LoopbackBridgeServer server = new LoopbackBridgeServer(
-                queue, state.token(), new SkillStore(), playerLeftWorld::countDown)) {
+                queue, state.token(), new SkillStore(), minecraftExited::countDown)) {
             server.start(0);
             try (Socket client = new Socket(BridgeEndpoint.address(), server.port());
                  BufferedReader reader = reader(client);
                  BufferedWriter writer = writer(client)) {
                 send(writer, ProtocolMessage.hello(state.token()));
                 assertEquals("hello_accepted", receive(reader).type());
-                send(writer, ProtocolMessage.worldClosed());
-                assertTrue(playerLeftWorld.await(2, TimeUnit.SECONDS));
+                send(writer, ProtocolMessage.clientClosed());
+                assertTrue(minecraftExited.await(2, TimeUnit.SECONDS));
             }
         }
     }

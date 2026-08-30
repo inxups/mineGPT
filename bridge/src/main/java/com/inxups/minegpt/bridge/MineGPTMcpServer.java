@@ -56,6 +56,10 @@ final class MineGPTMcpServer {
                         (exchange, request) -> listGameFiles(request.arguments()))
                 .toolCall(tool("minegpt_read_game_file", "Read a bounded byte range from a regular file in the active Minecraft game directory as UTF-8 text or Base64.", gameFileReadSchema()),
                         (exchange, request) -> readGameFile(request.arguments()))
+                .toolCall(tool("minegpt_search_modpack_files", "Search bounded text files in likely recipe, KubeJS, config, datapack, and FTB Quests locations of the active instance. This is literal, read-only local evidence only.", modpackSearchSchema()),
+                        (exchange, request) -> searchModpackFiles(request.arguments()))
+                .toolCall(tool("minegpt_inspect_mod_jar", "Inspect one direct mods/*.jar file without executing it. Returns bounded Mod metadata plus matching recipe/resource text or printable class strings.", modJarInspectionSchema()),
+                        (exchange, request) -> inspectModJar(request.arguments()))
                 .toolCall(tool("minegpt_get_game_options", "Read and parse the active instance's options.txt client settings.", Map.of()),
                         (exchange, request) -> gameOptions())
                 .toolCall(tool("minegpt_list_installed_mods", "List .jar files directly in the active instance's mods directory.", Map.of()),
@@ -95,6 +99,8 @@ final class MineGPTMcpServer {
     private String instructions() {
         return "MineGPT bridges a local Minecraft client. The active game directory is available through read-only file tools after the client handshake. "
                 + "User-editable Markdown skills live in <active game run directory>/minegpt/skills and are optional workflows: call minegpt_list_skills only when a relevant skill is needed. "
+                + "For a request requiring current player, inventory, entity, block, chunk, biome, weather, or light data, load live-data/SKILL.md through minegpt_get_skill before choosing the corresponding read-only game-data tool. "
+                + "For a modpack item, block, recipe, machine, or progression question, load modpack-recipe-investigation/SKILL.md before searching local pack evidence. "
                 + "Only call minegpt_import_github_skill when the user explicitly asks to install a skill from a public GitHub repository. "
                 + "Game-data tools are read-only snapshots of client-visible data: they cannot load chunks from a server or modify the game.";
     }
@@ -174,6 +180,33 @@ final class MineGPTMcpServer {
             return success(ProtocolCodec.toJson(gameFiles.read(path, offset, maxBytes, encoding)));
         } catch (Exception exception) {
             return failure("Could not read Minecraft game file: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult searchModpackFiles(Map<String, Object> arguments) {
+        String query = stringArgument(arguments, "query");
+        String scope = stringArgument(arguments, "scope");
+        if (query == null || query.isBlank() || !isOptionalString(arguments, "query") || !isOptionalString(arguments, "scope")) {
+            return failure("query is required and scope must be a string when provided.");
+        }
+        try {
+            return success(ProtocolCodec.toJson(gameFiles.searchModpackFiles(query, scope)));
+        } catch (Exception exception) {
+            return failure("Could not search active modpack files: " + exception.getMessage());
+        }
+    }
+
+    private McpSchema.CallToolResult inspectModJar(Map<String, Object> arguments) {
+        String jarName = stringArgument(arguments, "jar_name");
+        String query = stringArgument(arguments, "query");
+        if (jarName == null || jarName.isBlank() || !isOptionalString(arguments, "jar_name")
+                || !isOptionalString(arguments, "query")) {
+            return failure("jar_name is required and query must be a string when provided.");
+        }
+        try {
+            return success(ProtocolCodec.toJson(gameFiles.inspectModJar(jarName, query)));
+        } catch (Exception exception) {
+            return failure("Could not inspect active Mod JAR: " + exception.getMessage());
         }
     }
 
@@ -434,6 +467,22 @@ final class MineGPTMcpServer {
                 "max_bytes", Map.of("type", "integer", "minimum", 1, "maximum", GameDirectoryStore.MAX_READ_BYTES,
                         "description", "Maximum bytes to return. Defaults to 65536."),
                 "encoding", Map.of("type", "string", "enum", List.of("utf8", "base64"), "description", "Defaults to utf8."));
+    }
+
+    private static Map<String, Object> modpackSearchSchema() {
+        return Map.of(
+                "query", Map.of("type", "string", "minLength", 1, "maxLength", GameDirectoryStore.MAX_MODPACK_QUERY_LENGTH,
+                        "description", "Required literal item ID, tag, recipe type, machine name, or other local search term."),
+                "scope", Map.of("type", "string", "enum", List.of("all", "recipes", "kubejs", "quests", "config"),
+                        "description", "Limits likely roots. Defaults to all."));
+    }
+
+    private static Map<String, Object> modJarInspectionSchema() {
+        return Map.of(
+                "jar_name", Map.of("type", "string", "minLength", 5, "maxLength", GameDirectoryStore.MAX_MOD_JAR_NAME_LENGTH,
+                        "description", "Required direct .jar filename returned by minegpt_list_installed_mods."),
+                "query", Map.of("type", "string", "minLength", 1, "maxLength", GameDirectoryStore.MAX_MODPACK_QUERY_LENGTH,
+                        "description", "Optional literal term to find in recipe/resource text or printable class strings."));
     }
 
     private static Map<String, Object> recentLogSchema() {

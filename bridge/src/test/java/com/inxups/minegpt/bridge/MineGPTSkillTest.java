@@ -18,16 +18,24 @@ class MineGPTSkillTest {
         SkillStore skills = new SkillStore(temporaryDirectory);
         skills.initialize();
         assertTrue(Files.isRegularFile(temporaryDirectory.resolve("minegpt/skills/minegpt-guide.md")));
+        assertTrue(Files.isRegularFile(temporaryDirectory.resolve("minegpt/skills/live-data/SKILL.md")));
+        assertTrue(Files.isRegularFile(temporaryDirectory.resolve("minegpt/skills/modpack-recipe-investigation/SKILL.md")));
 
         Files.writeString(temporaryDirectory.resolve("minegpt/skills/caving.md"), "---\ndescription: Caving advice\n---\n# Caving\n");
-        assertEquals(2, skills.list().size());
+        assertEquals(4, skills.list().size());
         assertEquals("Caving advice", skills.list().get(0).description());
         assertTrue(skills.read("caving.md").contains("# Caving"));
 
         Path defaultSkill = temporaryDirectory.resolve("minegpt/skills/minegpt-guide.md");
+        Path liveDataSkill = temporaryDirectory.resolve("minegpt/skills/live-data/SKILL.md");
+        Path recipeSkill = temporaryDirectory.resolve("minegpt/skills/modpack-recipe-investigation/SKILL.md");
         Files.delete(defaultSkill);
+        Files.delete(liveDataSkill);
+        Files.delete(recipeSkill);
         skills.list();
         assertTrue(Files.isRegularFile(defaultSkill));
+        assertTrue(Files.isRegularFile(liveDataSkill));
+        assertTrue(Files.isRegularFile(recipeSkill));
     }
 
     @Test

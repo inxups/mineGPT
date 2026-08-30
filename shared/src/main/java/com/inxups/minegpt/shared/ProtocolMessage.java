@@ -27,9 +27,9 @@ public record ProtocolMessage(
         return new ProtocolMessage("hello_accepted", null, null, null, null, null, null, null, null, null, null, null);
     }
 
-    /** Sent by the Mod before its player leaves the current world. */
-    public static ProtocolMessage worldClosed() {
-        return new ProtocolMessage("world_closed", null, null, null, null, null, null, null, null, null, null, null);
+    /** Sent by the Mod only while the Minecraft client is shutting down. */
+    public static ProtocolMessage clientClosed() {
+        return new ProtocolMessage("client_closed", null, null, null, null, null, null, null, null, null, null, null);
     }
 
     public static ProtocolMessage playerMessage(PlayerMessage message) {

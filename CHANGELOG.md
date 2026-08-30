@@ -25,6 +25,16 @@
   regular file anywhere under the active instance directory in bounded chunks.
   It returns UTF-8 text or Base64, with a default 64 KiB and maximum 256 KiB per
   call; use `offset` to continue a larger file.
+- `minegpt_search_modpack_files(query, scope?)` performs a bounded,
+  case-insensitive literal search of text files in likely active-pack locations.
+  Its scopes are `all`, `recipes`, `kubejs`, `quests`, and `config`; it checks
+  KubeJS, datapacks, configs, global packs, FTB Quests locations, and local
+  save datapacks where applicable. It scans at most 2,000 files, reads at most
+  512 KiB per file, skips symlinks, and returns at most 100 line snippets.
+- `minegpt_inspect_mod_jar(jar_name, query?)` reads one `.jar` directly under
+  the active instance's `mods/` directory. It returns bounded recognized Mod
+  metadata and, when queried, matching recipe/resource text or printable class
+  strings. It never extracts, executes, or decompiles Mod code.
 - `minegpt_get_game_options()` parses the active instance's `options.txt`.
 - `minegpt_list_installed_mods()` lists Mod JARs in `mods/`, and
   `minegpt_list_saved_worlds()` lists world directories in `saves/`.

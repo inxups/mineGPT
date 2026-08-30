@@ -47,8 +47,8 @@ Minecraft @gpt 消息 -> 本地 MineGPT Bridge -> ChatGPT 桌面版 -> 本地回
 
 监听期间请保持这个 ChatGPT 对话处于打开状态。Minecraft 无法自行打开或唤醒对话。
 
-离开 Minecraft 世界会自动结束对应的 MineGPT Bridge 会话。再次进入世界前，请在
-ChatGPT 桌面版中重新连接或重启 `minegpt` MCP 服务器。
+离开 Minecraft 世界或返回标题界面不会结束 MineGPT Bridge 会话；只有退出整个
+Minecraft 客户端时，Bridge 才会关闭。
 
 ## 游戏内使用
 
@@ -77,8 +77,12 @@ MineGPT 会为每个 Minecraft 实例创建可编辑的 Skill 文件夹：
 不同实例会使用各自独立的 Skill。可以直接放入 Markdown 文件，也可使用子目录，例如
 `building/redstone/guide.md`。路径最多支持八层目录，每个文件最大为 256 KiB。
 
-默认的 `minegpt-guide.md` 被删除后会自动恢复；你添加的 Skill 文件不会被覆盖或重新
-生成。
+内置的 `minegpt-guide.md`、`live-data/SKILL.md` 与
+`modpack-recipe-investigation/SKILL.md` 被删除后会自动恢复。
+`live-data/SKILL.md` 规定 ChatGPT 如何选择只读 MCP 工具来读取玩家状态、背包、实体、
+方块、区块和环境数据；整合包配方调查 Skill 会要求它先检索当前实例的本地数据包、KubeJS、
+配置、FTB Quests 文件和相关 Mod JAR 资源，再将合成或推进路线表述为已确认。你添加的
+Skill 文件不会被覆盖或重新生成。
 
 ## 隐私、安全与限制
 

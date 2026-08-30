@@ -15,7 +15,7 @@ public final class MineGPTClient implements AutoCloseable {
         this.platform = platform;
         pairingConfig = new PairingConfig(configPath);
         try {
-            SkillFileInstaller.ensureDefaultSkill(platform.gameDirectory());
+            SkillFileInstaller.ensureBuiltinSkills(platform.gameDirectory());
         } catch (IOException ignored) {
             // The game directory can be unavailable during unusual launcher startup; the Bridge retries after handshake.
         }
@@ -65,15 +65,11 @@ public final class MineGPTClient implements AutoCloseable {
         });
         bridge.setToken(pairingConfig.token());
         bridge.setGameDirectory(platform.gameDirectory());
+        Runtime.getRuntime().addShutdownHook(new Thread(this::close, "minegpt-client-shutdown"));
     }
 
     public void start() {
         bridge.start();
-    }
-
-    /** Stops the Bridge session when Minecraft leaves a singleplayer or multiplayer world. */
-    public void onWorldClosed() {
-        bridge.closeForWorldExit();
     }
 
     /**
@@ -146,6 +142,6 @@ public final class MineGPTClient implements AutoCloseable {
 
     @Override
     public void close() {
-        bridge.close();
+        bridge.closeForClientExit();
     }
 }

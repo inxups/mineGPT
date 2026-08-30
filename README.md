@@ -54,9 +54,8 @@ Minecraft @gpt message -> local MineGPT Bridge -> ChatGPT Desktop -> local reply
 Keep this ChatGPT conversation open while it is listening. Minecraft cannot
 open or wake a conversation on its own.
 
-Leaving a Minecraft world automatically ends its MineGPT Bridge session. Before
-entering another world, reconnect or restart the `minegpt` MCP server in
-ChatGPT Desktop.
+Leaving a Minecraft world or returning to the title screen keeps the MineGPT
+Bridge session open. The Bridge closes only when the Minecraft client exits.
 
 ## Use It In Game
 
@@ -88,8 +87,14 @@ Add Markdown files directly or in subfolders, such as
 `building/redstone/guide.md`. Paths may be up to eight folders deep and each
 file may be up to 256 KiB.
 
-The default `minegpt-guide.md` is restored if it is deleted. Your own skill
-files are never overwritten or regenerated.
+The built-in `minegpt-guide.md`, `live-data/SKILL.md`, and
+`modpack-recipe-investigation/SKILL.md` are restored if deleted.
+`live-data/SKILL.md` selects read-only tools for player state, inventory,
+entities, blocks, chunks, and environment data. The modpack recipe skill makes
+ChatGPT investigate the current instance's local datapacks, KubeJS, configs,
+FTB Quests files, and relevant Mod JAR resources before presenting a crafting
+or progression route as confirmed. Your own skill files are never overwritten
+or regenerated.
 
 ## Privacy, Safety, And Limits
 

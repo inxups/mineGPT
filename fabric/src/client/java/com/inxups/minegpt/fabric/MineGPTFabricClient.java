@@ -12,7 +12,6 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -51,8 +50,6 @@ public final class MineGPTFabricClient implements ClientModInitializer {
                 FabricLoader.getInstance().getConfigDir().resolve("minegpt.json"),
                 new FabricPlatform());
         ClientSendMessageEvents.ALLOW_CHAT.register(message -> !mineGPT.handleChat(message));
-        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> mineGPT.start());
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> mineGPT.onWorldClosed());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
                 ClientCommandManager.literal("minegpt")
                         .then(ClientCommandManager.literal("pair")
@@ -69,6 +66,7 @@ public final class MineGPTFabricClient implements ClientModInitializer {
                         .then(ClientCommandManager.literal("github")
                                 .then(ClientCommandManager.argument("github_url", StringArgumentType.greedyString())
                                         .executes(this::importGitHubSkill)))));
+        mineGPT.start();
         LOGGER.info("MineGPT Fabric client initialized");
     }
 

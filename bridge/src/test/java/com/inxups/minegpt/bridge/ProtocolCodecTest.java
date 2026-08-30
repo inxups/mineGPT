@@ -15,8 +15,8 @@ class ProtocolCodecTest {
     }
 
     @Test
-    void roundTripsWorldClosedSignal() {
-        ProtocolMessage expected = ProtocolMessage.worldClosed();
+    void roundTripsClientClosedSignal() {
+        ProtocolMessage expected = ProtocolMessage.clientClosed();
         assertEquals(expected, ProtocolCodec.decode(ProtocolCodec.encode(expected)));
     }
 
