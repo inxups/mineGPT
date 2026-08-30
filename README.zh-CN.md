@@ -126,3 +126,9 @@ cd neoforge
 
 Bridge 会写入 `bridge/build/install/minegpt-bridge`；Mod JAR 会写入所选项目的
 `build/libs` 目录。
+
+## 发行版本
+
+只需修改仓库根目录的 [`version.properties`](version.properties) 中的
+`minegpt_version`。Fabric、NeoForge、Bridge 发行包、Mod 元数据和 Bridge MCP Server
+版本都会使用这个值。

@@ -3,6 +3,9 @@ plugins {
 	id 'maven-publish'
 }
 
+apply from: file('../gradle/version.gradle')
+def releaseVersion = minegptVersion
+
 repositories {
 	// Add repositories to retrieve artifacts from in here.
 	// You should only use this when depending on other mods because
@@ -40,11 +43,23 @@ dependencies {
 }
 
 processResources {
-	def version = project.version
-	inputs.property "version", version
+	inputs.property "version", releaseVersion
+	inputs.property "minegpt_version", releaseVersion
 
 	filesMatching("fabric.mod.json") {
-		expand "version": version
+		expand "version": releaseVersion
+	}
+
+	filesMatching("minegpt-build.properties") {
+		expand "minegpt_version": releaseVersion
+	}
+}
+
+tasks.named("processClientResources") {
+	inputs.property "minegpt_version", releaseVersion
+
+	filesMatching("minegpt-build.properties") {
+		expand "minegpt_version": releaseVersion
 	}
 }
 

@@ -5,6 +5,9 @@ plugins {
     id 'idea'
 }
 
+apply from: file('../gradle/version.gradle')
+def releaseVersion = minegptVersion
+
 tasks.named('wrapper', Wrapper).configure {
     // Define wrapper values here so as to not have to always do so when updating gradlew.properties.
     // Switching this to Wrapper.DistributionType.ALL will download the full gradle sources that comes with
@@ -14,7 +17,6 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = mod_version
 group = mod_group_id
 
 sourceSets.main.resources {
@@ -29,6 +31,13 @@ sourceSets.main.resources {
 }
 
 sourceSets.main.java.srcDir('../shared/src/main/java')
+
+tasks.named('processResources', ProcessResources).configure {
+    inputs.property 'minegpt_version', releaseVersion
+    filesMatching('minegpt-build.properties') {
+        expand 'minegpt_version': releaseVersion
+    }
+}
 
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
@@ -129,7 +138,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
-            mod_version            : mod_version,
+            mod_version            : releaseVersion,
     ]
     inputs.properties replaceProperties
     expand replaceProperties

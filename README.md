@@ -140,3 +140,10 @@ cd neoforge
 
 The Bridge is written to `bridge/build/install/minegpt-bridge`. The Mod JAR is
 written to the selected project's `build/libs` directory.
+
+## Release Version
+
+Set `minegpt_version` once in the repository-root
+[`version.properties`](version.properties). Fabric, NeoForge, the Bridge
+distribution, Mod metadata, and the Bridge MCP Server version all use that
+value.

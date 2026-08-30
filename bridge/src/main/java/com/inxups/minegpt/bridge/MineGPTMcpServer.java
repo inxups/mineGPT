@@ -5,6 +5,7 @@ import com.inxups.minegpt.shared.ChunkInfo;
 import com.inxups.minegpt.shared.ChunkQuery;
 import com.inxups.minegpt.shared.GameQuery;
 import com.inxups.minegpt.shared.GameQueryResult;
+import com.inxups.minegpt.shared.MineGPTVersion;
 import com.inxups.minegpt.shared.ProtocolCodec;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
@@ -37,7 +38,7 @@ final class MineGPTMcpServer {
     McpSyncServer start() {
         StdioServerTransportProvider transport = new StdioServerTransportProvider(McpJsonDefaults.getMapper());
         return McpServer.sync(transport)
-                .serverInfo("minegpt", "0.1.0")
+                .serverInfo("minegpt", MineGPTVersion.current())
                 .instructions(instructions())
                 .toolCall(tool("minegpt_status", "Return MineGPT bridge connection and queue status.", Map.of()),
                         (exchange, request) -> success(ProtocolCodec.toJson(bridge.status())))

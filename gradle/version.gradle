@@ -1,0 +1,16 @@
+import java.util.Properties
+
+def mineGptVersionFile = rootProject.projectDir.parentFile.toPath().resolve("version.properties").toFile()
+if (!mineGptVersionFile.isFile()) {
+    throw new GradleException("MineGPT version file is missing: ${mineGptVersionFile}")
+}
+
+def mineGptVersionProperties = new Properties()
+mineGptVersionFile.withInputStream { stream -> mineGptVersionProperties.load(stream) }
+def mineGptVersion = mineGptVersionProperties.getProperty("minegpt_version")?.trim()
+if (!mineGptVersion) {
+    throw new GradleException("minegpt_version must be set in ${mineGptVersionFile}")
+}
+
+ext.minegptVersion = mineGptVersion
+version = mineGptVersion
